@@ -6,8 +6,8 @@ window.onerror = function(msg, url, line) {
   document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h3 style="color:red;">Error al cargar</h3><p>' + msg + '</p><p>Línea: ' + line + '</p></div>';
 };
 
-// URL de tu Worker en Cloudflare
-const WORKER_URL = 'https://bubbletree-api.tunombre.workers.dev';
+// URL configurada de tu Cloudflare Worker
+const WORKER_URL = 'https://bubbletree.jairletelier23.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const NET = {
@@ -44,7 +44,6 @@ const esc = function(s){ return String(s !== null && s !== undefined ? s : '').r
 const $ = function(s,r) { return (r||document).querySelector(s); };
 const enc = function(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
 
-// Función para generar un ID limpio y automático basado en el título
 const slugify = function(s){ 
   return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0,30); 
 };
@@ -62,7 +61,7 @@ function sanitize(o){
   if(!o||typeof o!=='object') return r;
   if(typeof o.n==='string') r.n=o.n.slice(0,60);
   if(typeof o.id==='string' && o.id) r.id=o.id.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
-  if(!r.id && r.n) r.id = slugify(r.n); // Auto-crear ID si no existe
+  if(!r.id && r.n) r.id = slugify(r.n);
   if(typeof o.d==='string') r.d=o.d.slice(0,160);
   if(o.a&&typeof o.a.v==='string'){
     if(o.a.m==='ig'||o.a.m==='url') r.a={m:o.a.m,v:o.a.v.slice(0,400)};
@@ -381,7 +380,6 @@ function startEditor(S){
   renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine(); save();
   if(S.a && S.a.v) updateAvatar(S,setStatus,true);
 
-  // Al escribir el nombre, generamos automáticamente el ID
   $('#n').oninput = function(e){ 
     S.n=e.target.value; 
     S.id=slugify(S.n);
@@ -458,12 +456,6 @@ function startEditor(S){
 
     upsertCard();
 
-    if(!WORKER_URL || WORKER_URL.indexOf('tunombre.workers.dev') !== -1){
-      refreshLink();
-      toast('Guardado localmente.');
-      return;
-    }
-
     btn.disabled=true; btn.textContent='Guardando…';
 
     try {
@@ -504,14 +496,12 @@ function startEditor(S){
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
     if(!confirm('¿Borrar la tarjeta "' + c.n + '"?\nSe eliminará de tu lista.')) return;
     
-    if(WORKER_URL && WORKER_URL.indexOf('tunombre.workers.dev') === -1){
-      const delBtn=$('#delc');
-      if(delBtn){ delBtn.disabled = true; delBtn.textContent = 'Borrando…'; }
-      try {
-        await fetch(WORKER_URL + '?id=' + encodeURIComponent(id), { method: 'DELETE' });
-      } catch(e){}
-      if(delBtn){ delBtn.disabled = false; delBtn.textContent = 'Borrar'; }
-    }
+    const delBtn=$('#delc');
+    if(delBtn){ delBtn.disabled = true; delBtn.textContent = 'Borrando…'; }
+    try {
+      await fetch(WORKER_URL + '?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    } catch(e){}
+    if(delBtn){ delBtn.disabled = false; delBtn.textContent = 'Borrar'; }
 
     putCards(a.filter(function(x){ return x.id!==id; }));
     if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null);
