@@ -184,10 +184,10 @@ function startEditor(S){
     <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>globos</div>
     <div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>
     <select class="tb sel" id="mine" aria-label="Mis tarjetas"></select>
-    <button class="tb" id="newc" type="button">Nueva tarjeta</button>
+    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5">Guardar</button>
+    <button class="tb" id="newc" type="button">Nueva</button>
     <button class="tb" id="delc" type="button">Borrar</button>
-    <button class="tb" id="open" type="button">Abrir enlace</button>
-    <button class="tb" id="vis" type="button">Ver como visitante</button>
+    <button class="tb" id="vis" type="button">Vista previa</button>
     <button class="copy" id="copy" type="button">Copiar enlace</button>
   </div>
   <div class="split">
@@ -200,9 +200,9 @@ function startEditor(S){
     <div class="sec"><div class="sh"><b>2</b>Tema</div><div class="themes" id="themes"></div></div>
     <div class="sec"><div class="sh"><b>3</b>Globos de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
     <div class="sec"><div class="sh"><b>4</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
-    <div class="note"><span>Todo vive dentro del enlace: sin cuentas ni base de datos. Cambia algo, vuelve a copiar el enlace y listo.</span></div>
+    <div class="note"><span>Al tocar "Guardar", se guarda tu tarjeta y se genera automáticamente tu enlace corto listo para copiar.</span></div>
    </div>
-   <div class="stage"><div class="bar"><span class="live"><i></i>Vista previa en vivo</span><button class="play" id="play" type="button">▶ Probar efecto de globos</button><label class="chk"><input type="checkbox" id="shortOn" checked> Acortar enlace al copiar</label></div>
+   <div class="stage"><div class="bar"><span class="live"><i></i>Vista previa en vivo</span><button class="play" id="play" type="button">▶ Probar efecto de globos</button><label class="chk"><input type="checkbox" id="shortOn" checked> Acortar enlace al guardar</label></div>
      <div class="warn" id="warn" hidden></div>
      <div class="phone" id="phone">${cardHTML()}</div>
      <div style="font-size:13px;color:#4A465C;text-align:center">Cada letra, color o logo se refleja aquí al instante.</div>
@@ -256,18 +256,33 @@ function startEditor(S){
 
   async function getShort(l){
     if(location.protocol==='file:'){
-      return {err:'Publica tu proyecto en GitHub Pages para usar acortadores reales.'};
+      return {err:'Publica tu proyecto en GitHub Pages para acortar enlaces.'};
     }
     try{
-      const r=await fetch('https://tinyurl.com/api-create.php?url='+encodeURIComponent(l));
-      const t=(await r.text()).trim();
-      if(/^https?:\/\/\S+$/.test(t)) return {u:t};
+      const res = await fetch('https://tinyurl.com/api-create.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({url: l})
+      });
+      const txt = (await res.text()).trim();
+      if(/^https?:\/\/\S+$/.test(txt)) return {u:txt};
     }catch{}
+
+    try{
+      const res = await fetch('https://tinyurl.com/api-create.php?url='+encodeURIComponent(l));
+      const txt = (await res.text()).trim();
+      if(/^https?:\/\/\S+$/.test(txt)) return {u:txt};
+    }catch{}
+
     for(const host of ['is.gd','v.gd']){
       const d=await jsonp(`https://${host}/create.php?format=json&url=${encodeURIComponent(l)}`);
       if(d?.shorturl) return {u:d.shorturl};
     }
-    return {err:'Servicio ocupado o enlace demasiado extenso'};
+
+    if(S.a.m==='file' && l.length>2500){
+      return {err:'La foto subida es muy pesada para acortar. Usa URL o Instagram.'};
+    }
+    return {err:'No se pudo acortar'};
   }
 
   const missingCount = () => ({ g:S.g.filter(x=>!norm(x[0],x[1])).length, b:S.b.filter(x=>x[0].trim()&&!norm('',x[1])).length });
@@ -359,8 +374,8 @@ function startEditor(S){
       const n=96, c=document.createElement('canvas'); c.width=c.height=n;
       const s=Math.min(im.width,im.height);
       c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,n,n);
-      let q=.7, d=c.toDataURL('image/jpeg',q);
-      while(d.length>6000&&q>.3){ q-=.1; d=c.toDataURL('image/jpeg',q); }
+      let q=.6, d=c.toDataURL('image/jpeg',q);
+      while(d.length>4500&&q>.25){ q-=.08; d=c.toDataURL('image/jpeg',q); }
       URL.revokeObjectURL(u);
       S.a={m:'file',v:d}; $('#av').dataset.src=''; save(); lookup();
     };
@@ -411,22 +426,49 @@ function startEditor(S){
     window.open(longLink(),'_blank');
   };
 
-  $('#copy').onclick = async () => {
-    const btn=$('#copy'), long=longLink();
-    let out=long, msg='¡Enlace copiado!';
-    if($('#shortOn').checked){
-      const known=shortFor();
-      if(known) out=known;
-      else{
-        btn.disabled=true; btn.textContent='Acortando…';
-        const s=await getShort(long);
-        btn.disabled=false; btn.textContent='Copiar enlace';
-        if(s.u){ shortInfo={e:enc(S),u:s.u}; out=s.u; }
-        else msg=`No se pudo acortar (${s.err||'error'}); copié el enlace largo.${long.length>6000?' Muy largo por la foto: usa URL o usuario.':''}`;
-      }
+  // Guardar y acortar de inmediato
+  async function saveAndShortenAction(){
+    const btn=$('#savecard'), long=longLink();
+    upsertCard();
+
+    if(!$('#shortOn').checked){
+      refreshLink();
+      toast('¡Tarjeta guardada!');
+      return long;
     }
-    const mc=missingCount(); if(mc.g||mc.b) msg+=' Ojo: hay globos o botones sin enlace que no se mostrarán.';
-    upsertCard(); refreshLink(); copyText(out,msg);
+
+    const known=shortFor();
+    if(known){
+      refreshLink();
+      toast('¡Tarjeta guardada!');
+      return known;
+    }
+
+    btn.disabled=true; btn.textContent='Guardando…';
+    const s=await getShort(long);
+    btn.disabled=false; btn.textContent='Guardar';
+
+    if(s.u){
+      shortInfo={e:enc(S),u:s.u};
+      upsertCard();
+      refreshLink();
+      toast('¡Tarjeta guardada y enlace corto listo!');
+      return s.u;
+    } else {
+      refreshLink();
+      toast('Guardada. ' + (s.err || 'Usa el enlace completo.'));
+      return long;
+    }
+  }
+
+  $('#savecard').onclick = saveAndShortenAction;
+
+  $('#copy').onclick = async () => {
+    const link = await saveAndShortenAction();
+    const mc=missingCount();
+    let msg='¡Enlace copiado!';
+    if(mc.g||mc.b) msg+=' (Hay elementos sin enlace que no se mostrarán)';
+    copyText(link, msg);
   };
 
   $('#mine').onchange = e => {
@@ -448,18 +490,8 @@ function startEditor(S){
 
   $('#newc').onclick = () => {
     const e=enc(S), saved=getCards().some(c=>c.e===e);
-    if(e!==enc(DEFAULT)&&!saved&&!confirm('Esta tarjeta aún no tiene enlace copiado y se perderá. ¿Empezar una nueva igual?')) return;
-    loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null); toast('Tarjeta nueva');
-  };
-
-  $('#open').onclick = () => {
-    const v=prompt('Pega aquí el enlace de una tarjeta para editarla:'); if(!v) return;
-    let dataPart = null;
-    if(v.includes('?d=')) dataPart = v.split('?d=')[1].split('&')[0];
-    else if(v.includes('#')) dataPart = v.split('#')[1];
-    const d = dataPart ? dec(dataPart) : null;
-    if(!d){ toast('Enlace no válido. Si es corto, elígela en "Mis tarjetas"'); return; }
-    loadState(d,null,null); toast('Enlace cargado');
+    if(e!==enc(DEFAULT)&&!saved&&!confirm('Esta tarjeta aún no está guardada. ¿Empezar una nueva de todas formas?')) return;
+    loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null); toast('Tarjeta nueva iniciada');
   };
 }
 
