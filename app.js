@@ -42,11 +42,11 @@ const DEFAULT = {
   b:[['Catálogo PDF',''],['Tienda online','']]
 };
 
-const clone = o => JSON.parse(JSON.stringify(o));
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const $ = (s, r) => (r || document).querySelector(s);
-const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-const slugify = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0,30);
+const clone = function(o){ return JSON.parse(JSON.stringify(o)); };
+const esc = function(s){ return String(s !== null && s !== undefined ? s : '').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
+const $ = function(s, r){ return (r || document).querySelector(s); };
+const enc = function(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+const slugify = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0,30); };
 
 function dec(s){
   if(!s) return null;
@@ -64,16 +64,17 @@ function sanitize(o){
   if(typeof o.id === 'string' && o.id) r.id = slugify(o.id);
   if(!r.id && r.n) r.id = slugify(r.n);
   if(typeof o.d === 'string') r.d = o.d.slice(0,160);
-  if(o.a && typeof o.a === 'object'){
-    r.a = {
-      m: (o.a.m === 'url' || o.a.m === 'ig') ? o.a.m : 'ig',
-      v: typeof o.a.v === 'string' ? o.a.v.trim().slice(0,400) : ''
-    };
+  if(typeof o.a === 'string' && o.a.trim()){
+    r.a = { m: 'url', v: o.a.trim().slice(0,400) };
+  } else if(o.a && typeof o.a === 'object'){
+    const val = typeof o.a.v === 'string' ? o.a.v.trim().slice(0,400) : '';
+    const mode = (o.a.m === 'url' || o.a.m === 'ig') ? o.a.m : (/^https?:\/\//i.test(val) ? 'url' : 'ig');
+    r.a = { m: mode, v: val };
   }
   r.lo = o.lo === 1 ? 1 : 0;
   if(TH[o.t]) r.t = o.t;
-  if(Array.isArray(o.g)) r.g = o.g.filter(x => Array.isArray(x) && NET[x[0]]).slice(0,12).map(x => [x[0], String(x[1]||'').slice(0,400)]);
-  if(Array.isArray(o.b)) r.b = o.b.filter(x => Array.isArray(x)).slice(0,8).map(x => [String(x[0]||'').slice(0,60), String(x[1]||'').slice(0,400)]);
+  if(Array.isArray(o.g)) r.g = o.g.filter(function(x){ return Array.isArray(x) && NET[x[0]]; }).slice(0,12).map(function(x){ return [x[0], String(x[1]||'').slice(0,400)]; });
+  if(Array.isArray(o.b)) r.b = o.b.filter(function(x){ return Array.isArray(x); }).slice(0,8).map(function(x){ return [String(x[0]||'').slice(0,60), String(x[1]||'').slice(0,400)]; });
   return r;
 }
 
@@ -86,29 +87,29 @@ function norm(k, u){
   return 'https://' + u.replace(/^\/+/,'');
 }
 
-const iconHTML = k => k === 'link' ? LINKSVG : '<img src="https://cdn.simpleicons.org/'+k+'/white" alt="" data-l="'+esc(NET[k].n[0])+'" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">';
+const iconHTML = function(k){ return k === 'link' ? LINKSVG : '<img src="https://cdn.simpleicons.org/'+k+'/white" alt="" data-l="'+esc(NET[k].n[0])+'" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">'; };
 
 function layout(n, W){
   const H = Math.max(170, Math.min(330, 100 + n * 34)), base = [88,80,74,68,62,56];
-  const sizes = Array.from({length:n}, (_,i) => base[i % base.length]).sort(() => Math.random() - .5);
+  const sizes = Array.from({length:n}, function(_,i){ return base[i % base.length]; }).sort(function(){ return Math.random() - .5; });
   for(let att = 0; att < 8; att++){
-    const k = (1 - att * .07) * (W < 300 ? .9 : 1), ss = sizes.map(s => Math.round(s * k));
-    const order = ss.map((_,i) => i).sort((a,b) => ss[b] - ss[a]), placed = []; let ok = true;
+    const k = (1 - att * .07) * (W < 300 ? .9 : 1), ss = sizes.map(function(s){ return Math.round(s * k); });
+    const order = ss.map(function(_,i){ return i; }).sort(function(a,b){ return ss[b] - ss[a]; }), placed = []; let ok = true;
     for(let oi = 0; oi < order.length; oi++){
       const i = order[oi], s = ss[i]; let p = null;
       for(let t = 0; t < 250 && !p; t++){
         const x = Math.random() * (W - s), y = Math.random() * (H - s), cx = x + s/2, cy = y + s/2;
-        if(placed.every(q => Math.hypot(cx - q.cx, cy - q.cy) >= (s + q.s)/2 + 6)) p = {x, y, cx, cy, s, i};
+        if(placed.every(function(q){ return Math.hypot(cx - q.cx, cy - q.cy) >= (s + q.s)/2 + 6; })) p = {x:x, y:y, cx:cx, cy:cy, s:s, i:i};
       }
       if(!p){ ok = false; break; } placed.push(p);
     }
-    if(ok){ const out = []; placed.forEach(p => out[p.i] = p); return {H, items: out}; }
+    if(ok){ const out = []; placed.forEach(function(p){ out[p.i] = p; }); return {H:H, items: out}; }
   }
   const cols = Math.max(1, Math.ceil(Math.sqrt(n * W / H))), cell = W / cols, s = Math.floor(cell * .82);
-  return {H: Math.max(H, Math.ceil(n / cols) * cell), items: Array.from({length:n}, (_,i) => ({x: (i % cols) * cell + (cell - s)/2, y: Math.floor(i / cols) * cell + (cell - s)/2, s}))};
+  return {H: Math.max(H, Math.ceil(n / cols) * cell), items: Array.from({length:n}, function(_,i){ return {x: (i % cols) * cell + (cell - s)/2, y: Math.floor(i / cols) * cell + (cell - s)/2, s:s}; })};
 }
 
-const cardHTML = () => '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt=""><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>';
+const cardHTML = function(){ return '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt=""><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>'; };
 
 let LAY = null, LAYSIG = '';
 function applyTheme(el, t){
@@ -122,8 +123,10 @@ function applyTheme(el, t){
 }
 
 function avatarURL(a){
-  const v = (a && a.v ? a.v : '').trim(); if(!v) return '';
-  if(a.m === 'ig'){
+  if(!a) return '';
+  const v = (typeof a === 'string' ? a : (a.v || '')).trim();
+  if(!v) return '';
+  if(a.m === 'ig' && !/^https?:\/\//i.test(v)){
     const m = v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u = m ? m[1] : v.replace(/^@/,'').split(/[\/?#\s]/)[0];
     return u ? 'https://unavatar.io/instagram/' + encodeURIComponent(u) + '?fallback=false' : '';
@@ -141,50 +144,51 @@ function updateAvatar(S, cb, force) {
   if (!url) {
     img.style.display = 'none';
     img.removeAttribute('src');
-    delete img.dataset.loadedUrl;
     if (cb) cb('none');
     return;
   }
 
-  if (img.dataset.loadedUrl === url && img.complete && img.naturalHeight > 0) {
-    img.style.display = 'block';
+  // Si ya tiene esta misma URL asignada y está visible, no la tocamos para evitar parpadeos
+  if (img.getAttribute('src') === url && img.style.display === 'block') {
     if (cb) cb('ok');
     return;
   }
 
-  if (S.a && S.a.m === 'ig' && !force && img.dataset.loadedUrl !== url) {
+  if (S.a && S.a.m === 'ig' && !force && img.getAttribute('src') !== url) {
     if (cb) cb('pending');
     return;
   }
 
+  if (cb) cb('load');
   img.onload = function() {
-    img.dataset.loadedUrl = url;
     img.style.display = 'block';
     if (cb) cb('ok');
   };
   img.onerror = function() {
-    delete img.dataset.loadedUrl;
     img.style.display = 'none';
     if (cb) cb('err');
   };
-  if (cb) cb('load');
-  img.referrerPolicy = 'no-referrer';
   img.src = url;
+  // Si el navegador ya la tenía en caché inmediata
+  if (img.complete && img.naturalWidth > 0) {
+    img.style.display = 'block';
+    if (cb) cb('ok');
+  }
 }
 
 function renderCloud(S, visitor, W, fresh){
   const cloud = $('#cloud'); if(!cloud) return;
-  let list = (S.g||[]).map((g,i) => ({k: g[0], u: norm(g[0], g[1]), i}));
-  if(visitor) list = list.filter(x => x.u);
+  let list = (S.g||[]).map(function(g,i){ return {k: g[0], u: norm(g[0], g[1]), i:i}; });
+  if(visitor) list = list.filter(function(x){ return x.u; });
   if(!list.length){ cloud.style.display = 'none'; cloud.innerHTML = ''; return; }
   cloud.style.display = 'block';
-  const sig = list.map(x => x.k).join(',') + '|' + W;
+  const sig = list.map(function(x){ return x.k; }).join(',') + '|' + W;
   if(fresh || !LAY || sig !== LAYSIG){
     LAY = layout(list.length, W); LAYSIG = sig;
-    LAY.meta = list.map(() => ({d: Math.round(Math.random()*350), t: (3+Math.random()*1.8).toFixed(2), f: (-Math.random()*3).toFixed(2)}));
+    LAY.meta = list.map(function(){ return {d: Math.round(Math.random()*350), t: (3+Math.random()*1.8).toFixed(2), f: (-Math.random()*3).toFixed(2)}; });
   }
   cloud.style.width = W + 'px'; cloud.style.height = LAY.H + 'px';
-  cloud.innerHTML = list.map((x,j) => {
+  cloud.innerHTML = list.map(function(x,j){
     const p = LAY.items[j] || {x:0,y:0,s:60}, m = LAY.meta[j] || {d:0,t:3,f:0}, net = NET[x.k] || NET.link;
     const tag = x.u ? 'a' : 'span', href = x.u ? ' href="'+esc(x.u)+'" target="_blank" rel="noopener"' : '';
     return '<'+tag+href+' class="gb'+(x.u?'':' ghost')+'" aria-label="'+esc(net.n)+'" style="left:'+Math.round(p.x)+'px;top:'+Math.round(p.y)+'px;width:'+p.s+'px;height:'+p.s+'px;--d:'+(80+j*90+m.d%120)+'ms"><span class="bi" style="background:'+net.c+';--t:'+m.t+'s;--f:'+m.f+'s;--glow:'+(GLOW[x.k]||'#fff')+'">'+iconHTML(x.k)+'</span></'+tag+'>';
@@ -193,14 +197,15 @@ function renderCloud(S, visitor, W, fresh){
 
 function renderBtns(S, visitor){
   const el = $('#cb'); if(!el) return;
-  const list = (S.b||[]).map(b => ({t: b[0], u: norm('', b[1])})).filter(b => b.t.trim() && (!visitor || b.u));
-  el.innerHTML = list.map((b,i) => {
+  const list = (S.b||[]).map(function(b){ return {t: b[0], u: norm('', b[1])}; }).filter(function(b){ return b.t.trim() && (!visitor || b.u); });
+  el.innerHTML = list.map(function(b,i){
     const cls = 'btn' + (i === 0 ? ' primary' : '') + (b.u ? '' : ' ghost');
     return b.u ? '<a class="'+cls+'" href="'+esc(b.u)+'" target="_blank" rel="noopener">'+esc(b.t)+'</a>' : '<span class="'+cls+'">'+esc(b.t)+'</span>';
   }).join('');
 }
 
-function updateCard(S, o = {}){
+function updateCard(S, o){
+  o = o || {};
   const cn = $('#cn'), cd = $('#cd'), cloud = $('#cloud');
   if(cn) cn.textContent = S.n;
   if(cd){ cd.textContent = S.d; cd.style.display = S.d.trim() ? '' : 'none'; }
@@ -219,6 +224,7 @@ function updateCard(S, o = {}){
 }
 
 function startVisitor(S){
+  S = sanitize(S);
   document.body.classList.add('visitor');
   document.title = S.n || 'BubbleTree';
   let app = $('#app');
@@ -231,7 +237,7 @@ function startVisitor(S){
   }
   const root = document.documentElement;
   applyTheme(root, S.t);
-  updateCard(S, {visitor: true, W: Math.min(340, Math.max(240, innerWidth - 48)), themeEl: root});
+  updateCard(S, {visitor: true, force: true, W: Math.min(340, Math.max(240, innerWidth - 48)), themeEl: root});
 }
 
 function startEditor(S){
@@ -240,7 +246,7 @@ function startEditor(S){
   let cardId = S.id || null;
   try{ if(!cardId) cardId = localStorage.getItem('globos-cur'); }catch(e){}
 
-  const catHTML = Object.keys(NET).map(k => '<button type="button" data-add="'+k+'" aria-label="Añadir '+esc(NET[k].n)+'" title="'+esc(NET[k].n)+'" style="background:'+NET[k].c+'">'+iconHTML(k)+'</button>').join('');
+  const catHTML = Object.keys(NET).map(function(k){ return '<button type="button" data-add="'+k+'" aria-label="Añadir '+esc(NET[k].n)+'" title="'+esc(NET[k].n)+'" style="background:'+NET[k].c+'">'+iconHTML(k)+'</button>'; }).join('');
 
   let app = $('#app');
   if(!app){ app = document.createElement('div'); app.id = 'app'; document.body.appendChild(app); }
@@ -288,12 +294,12 @@ function startEditor(S){
   '</div>';
 
   const phone = $('#phone'), W = 276, CK = 'globos-cards';
-  const getCards = () => { try{ return JSON.parse(localStorage.getItem(CK)) || []; }catch(e){ return []; } };
-  const putCards = a => { try{ localStorage.setItem(CK, JSON.stringify(a.slice(0,50))); }catch(e){} };
-  const setCur = () => { try{ cardId ? localStorage.setItem('globos-cur', cardId) : localStorage.removeItem('globos-cur'); }catch(e){} };
+  const getCards = function(){ try{ return JSON.parse(localStorage.getItem(CK)) || []; }catch(e){ return []; } };
+  const putCards = function(a){ try{ localStorage.setItem(CK, JSON.stringify(a.slice(0,50))); }catch(e){} };
+  const setCur = function(){ try{ cardId ? localStorage.setItem('globos-cur', cardId) : localStorage.removeItem('globos-cur'); }catch(e){} };
 
-  const getBaseUrl = () => (location.protocol === 'file:' || location.origin === 'null') ? location.href.split(/[?#]/)[0] : location.origin + location.pathname;
-  const getActiveLink = () => (S.id || cardId) ? getBaseUrl() + '?id=' + encodeURIComponent(S.id || cardId) : getBaseUrl() + '?d=' + enc(S);
+  const getBaseUrl = function(){ return (location.protocol === 'file:' || location.origin === 'null') ? location.href.split(/[?#]/)[0] : location.origin + location.pathname; };
+  const getActiveLink = function(){ return (S.id || cardId) ? getBaseUrl() + '?id=' + encodeURIComponent(S.id || cardId) : getBaseUrl() + '?d=' + enc(S); };
 
   function refreshLink(){
     const l = getActiveLink(), lk = $('#lk'), sz = $('#sz');
@@ -303,21 +309,21 @@ function startEditor(S){
 
   function refreshMine(){
     const a = getCards(), sel = $('#mine'); if(!sel) return;
-    sel.innerHTML = '<option value="">Mis tarjetas ('+a.length+')</option>' + a.map(c => '<option value="'+esc(c.id)+'"'+(c.id===cardId?' selected':'')+'>'+esc(c.n)+'</option>').join('');
+    sel.innerHTML = '<option value="">Mis tarjetas ('+a.length+')</option>' + a.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===cardId?' selected':'')+'>'+esc(c.n)+'</option>'; }).join('');
     if(!cardId) sel.value = '';
   }
 
   function upsertCard(){
     const a = getCards();
     if(!cardId) cardId = S.id || ('c' + Date.now().toString(36));
-    let c = a.find(x => x.id === cardId);
+    let c = a.find(function(x){ return x.id === cardId; });
     if(!c){ c = {id: cardId}; a.unshift(c); }
     c.n = S.n || 'Sin nombre';
     c.e = enc(S);
     putCards(a); setCur(); refreshMine();
   }
 
-  const missingCount = () => ({ g: (S.g||[]).filter(x => !norm(x[0],x[1])).length, b: (S.b||[]).filter(x => x[0].trim() && !norm('',x[1])).length });
+  const missingCount = function(){ return { g: (S.g||[]).filter(function(x){ return !norm(x[0],x[1]); }).length, b: (S.b||[]).filter(function(x){ return x[0].trim() && !norm('',x[1]); }).length }; };
 
   function refreshWarn(){
     const m = missingCount(), el = $('#warn'); if(!el) return;
@@ -340,21 +346,23 @@ function startEditor(S){
     el.textContent = msgs[s] || (photoMode === 'ig' ? 'No se pudo cargar la foto de Instagram.' : 'No se pudo cargar esa imagen.');
   }
 
-  function save(o = {}){
+  function save(o){
+    o = o || {};
     if(phone && phone.firstElementChild) phone.firstElementChild.classList.add('noanim');
-    updateCard(S, {W, themeEl: phone, fresh: o.fresh, force: o.force, onAvatar: setStatus});
+    updateCard(S, {W:W, themeEl: phone, fresh: o.fresh, force: o.force, onAvatar: setStatus});
     if(o.fresh && phone && phone.firstElementChild) phone.firstElementChild.classList.remove('noanim');
     refreshLink(); refreshWarn();
     const cnt = $('#cnt'); if(cnt) cnt.textContent = S.d.length + ' / 160';
     try{
       localStorage.setItem('globos-draft', enc(S));
-      const a = getCards(), idx = a.findIndex(x => x.id === cardId);
+      const a = getCards(), idx = a.findIndex(function(x){ return x.id === cardId; });
       if(idx !== -1){ a[idx].n = S.n || 'Sin nombre'; a[idx].e = enc(S); putCards(a); }
     }catch(e){}
   }
 
   function renderSeg(){
-    document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === photoMode));
+    const btns = document.querySelectorAll('#seg button');
+    for(let i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.m === photoMode);
     const ain = $('#av-in'), ago = $('#av-go');
     if(ain) ain.placeholder = photoMode === 'ig' ? 'tu.usuario' : 'https://…/foto.jpg';
     if(ago) ago.style.display = photoMode === 'ig' ? '' : 'none';
@@ -362,7 +370,7 @@ function startEditor(S){
 
   function renderThemes(){
     const th = $('#themes'); if(!th) return;
-    th.innerHTML = Object.keys(TH).map(k => {
+    th.innerHTML = Object.keys(TH).map(function(k){
       const T = TH[k], sw = T.neon ? 'background:#0A0A14;border:2px solid #D4FF4F;box-shadow:0 0 12px #D4FF4F88' : 'background:' + T.bg;
       return '<button type="button" data-t="'+k+'" class="'+(S.t===k?'on':'')+'"><i style="'+sw+'"></i>'+T.n+'</button>';
     }).join('');
@@ -370,7 +378,7 @@ function startEditor(S){
 
   function renderGlobos(){
     const gl = $('#gl'); if(!gl) return;
-    gl.innerHTML = (S.g||[]).map((g,i) => {
+    gl.innerHTML = (S.g||[]).map(function(g,i){
       const ph = g[0] === 'whatsapp' ? 'Número con código de país, ej. 56912345678' : g[0] === 'googlemaps' ? 'Enlace de Maps o dirección del lugar' : ['spotify','link','discord'].includes(g[0]) ? 'Pega el enlace' : '@usuario o enlace';
       return '<div class="item"><span class="ic" style="background:'+NET[g[0]].c+'">'+iconHTML(g[0])+'</span><input class="in" data-gi="'+i+'" aria-label="Enlace de '+esc(NET[g[0]].n)+'" placeholder="'+ph+'" value="'+esc(g[1])+'"><button class="x" type="button" data-gx="'+i+'" aria-label="Quitar '+esc(NET[g[0]].n)+'">✕</button></div>';
     }).join('') || '<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
@@ -378,7 +386,7 @@ function startEditor(S){
 
   function renderBtnsList(){
     const bl = $('#bl'); if(!bl) return;
-    bl.innerHTML = (S.b||[]).map((b,i) => '<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="'+i+'" aria-label="Texto del botón '+(i+1)+'" maxlength="60" value="'+esc(b[0])+'"><input class="in" data-bu="'+i+'" aria-label="Enlace del botón '+(i+1)+'" placeholder="https://…" value="'+esc(b[1])+'"><button class="x" type="button" data-bx="'+i+'" aria-label="Quitar botón '+(i+1)+'">✕</button></div>').join('');
+    bl.innerHTML = (S.b||[]).map(function(b,i){ return '<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="'+i+'" aria-label="Texto del botón '+(i+1)+'" maxlength="60" value="'+esc(b[0])+'"><input class="in" data-bu="'+i+'" aria-label="Enlace del botón '+(i+1)+'" placeholder="https://…" value="'+esc(b[1])+'"><button class="x" type="button" data-bx="'+i+'" aria-label="Quitar botón '+(i+1)+'">✕</button></div>'; }).join('');
   }
 
   function loadState(d, id){
@@ -390,7 +398,7 @@ function startEditor(S){
     $('#d').value = S.d;
     $('#av-in').value = (S.a && S.a.v) ? S.a.v : '';
     const chkLo = $('#lo'); if(chkLo) chkLo.checked = (S.lo === 1);
-    const av = $('#av'); if(av){ av.removeAttribute('src'); delete av.dataset.loadedUrl; }
+    const av = $('#av'); if(av){ av.style.display = 'none'; av.removeAttribute('src'); }
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine();
     save({force: true});
   }
@@ -398,35 +406,40 @@ function startEditor(S){
   loadState(S, cardId);
   if(S.__fromLink) upsertCard();
 
-  $('#n').oninput = e => { S.n = e.target.value; S.id = slugify(S.n); cardId = S.id || null; save(); };
-  $('#d').oninput = e => { S.d = e.target.value; save(); };
-  $('#lo').onchange = e => { S.lo = e.target.checked ? 1 : 0; save({fresh: true}); };
+  $('#n').oninput = function(e){ S.n = e.target.value; S.id = slugify(S.n); cardId = S.id || null; save(); };
+  $('#d').oninput = function(e){ S.d = e.target.value; save(); };
+  $('#lo').onchange = function(e){ S.lo = e.target.checked ? 1 : 0; save({fresh: true}); };
 
-  const lookup = () => updateAvatar(S, setStatus, true);
+  const lookup = function(){ updateAvatar(S, setStatus, true); };
   let avT;
-  $('#av-in').oninput = e => {
-    S.a = {m: photoMode, v: e.target.value.trim()};
+  $('#av-in').oninput = function(e){
+    const val = e.target.value.trim();
+    if(/^https?:\/\//i.test(val) && photoMode !== 'url'){
+      photoMode = 'url';
+      renderSeg();
+    }
+    S.a = {m: photoMode, v: val};
     save({force: photoMode === 'url'});
     clearTimeout(avT);
-    if(photoMode === 'ig' && S.a.v.length >= 2) avT = setTimeout(lookup, 1200);
+    if(photoMode === 'ig' && val.length >= 2) avT = setTimeout(lookup, 1200);
     else if(photoMode === 'url') lookup();
   };
-  $('#av-in').onkeydown = e => { if(e.key === 'Enter'){ clearTimeout(avT); lookup(); } };
-  $('#av-in').onblur = () => { clearTimeout(avT); lookup(); };
-  $('#av-go').onclick = () => { clearTimeout(avT); lookup(); };
+  $('#av-in').onkeydown = function(e){ if(e.key === 'Enter'){ clearTimeout(avT); lookup(); } };
+  $('#av-in').onblur = function(){ clearTimeout(avT); lookup(); };
+  $('#av-go').onclick = function(){ clearTimeout(avT); lookup(); };
 
-  $('#seg').onclick = e => {
+  $('#seg').onclick = function(e){
     const b = e.target.closest('button'); if(!b) return;
     photoMode = b.dataset.m;
     S.a = {m: photoMode, v: $('#av-in').value.trim()};
-    const av = $('#av'); if(av){ av.removeAttribute('src'); delete av.dataset.loadedUrl; }
+    const av = $('#av'); if(av){ av.style.display = 'none'; av.removeAttribute('src'); }
     renderSeg();
     save({force: true});
   };
 
-  $('#themes').onclick = e => { const b = e.target.closest('button'); if(b){ S.t = b.dataset.t; renderThemes(); save(); } };
+  $('#themes').onclick = function(e){ const b = e.target.closest('button'); if(b){ S.t = b.dataset.t; renderThemes(); save(); } };
 
-  $('#cat').onclick = e => {
+  $('#cat').onclick = function(e){
     const b = e.target.closest('button'); if(!b) return;
     if(S.g.length >= 12) return toast('Máximo 12 burbujas');
     S.g.push([b.dataset.add, '']); renderGlobos(); save();
@@ -434,36 +447,37 @@ function startEditor(S){
     if(ins.length) ins[ins.length - 1].focus();
   };
 
-  $('#gl').oninput = e => { const i = e.target.dataset.gi; if(i != null){ S.g[i][1] = e.target.value; save(); } };
-  $('#gl').onclick = e => { const b = e.target.closest('[data-gx]'); if(b){ S.g.splice(+b.dataset.gx, 1); renderGlobos(); save(); } };
+  $('#gl').oninput = function(e){ const i = e.target.dataset.gi; if(i != null){ S.g[i][1] = e.target.value; save(); } };
+  $('#gl').onclick = function(e){ const b = e.target.closest('[data-gx]'); if(b){ S.g.splice(+b.dataset.gx, 1); renderGlobos(); save(); } };
 
-  $('#bl').oninput = e => {
+  $('#bl').oninput = function(e){
     const t = e.target.dataset;
     if(t.bt != null) S.b[t.bt][0] = e.target.value;
     else if(t.bu != null) S.b[t.bu][1] = e.target.value;
     else return;
     save();
   };
-  $('#bl').onclick = e => { const b = e.target.closest('[data-bx]'); if(b){ S.b.splice(+b.dataset.bx, 1); renderBtnsList(); save(); } };
+  $('#bl').onclick = function(e){ const b = e.target.closest('[data-bx]'); if(b){ S.b.splice(+b.dataset.bx, 1); renderBtnsList(); save(); } };
 
-  $('#addb').onclick = () => {
+  $('#addb').onclick = function(){
     if(S.b.length >= 8) return toast('Máximo 8 botones');
     S.b.push(['Nuevo botón', '']); renderBtnsList(); save();
     const ins = document.querySelectorAll('#bl input[data-bt]');
     if(ins.length){ ins[ins.length - 1].focus(); ins[ins.length - 1].select(); }
   };
 
-  $('#play').onclick = () => save({fresh: true});
-  $('#vis').onclick = () => {
+  $('#play').onclick = function(){ save({fresh: true}); };
+  $('#vis').onclick = function(){
     const m = missingCount(); if(m.g || m.b) toast('Ojo: los elementos sin enlace no se mostrarán');
     window.open(getBaseUrl() + '?d=' + enc(S), '_blank');
   };
 
-  $('#savecard').onclick = async () => {
+  $('#savecard').onclick = async function(){
     const btn = $('#savecard');
     if(!S.n || !S.n.trim()){ toast('Escribe un nombre o título en el paso 1'); const ui = $('#n'); if(ui) ui.focus(); return; }
     if(!S.id) S.id = slugify(S.n);
-    S.a = {m: photoMode, v: $('#av-in').value.trim()};
+    const avVal = $('#av-in').value.trim();
+    if(avVal) S.a = {m: photoMode, v: avVal};
     upsertCard();
     btn.disabled = true; btn.textContent = 'Guardando…';
     try {
@@ -482,37 +496,37 @@ function startEditor(S){
     }
   };
 
-  $('#copy').onclick = () => {
+  $('#copy').onclick = function(){
     const t = getActiveLink();
     if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(t).then(() => toast('¡Enlace copiado al portapapeles!')).catch(() => prompt('Copia tu enlace:', t));
+      navigator.clipboard.writeText(t).then(function(){ toast('¡Enlace copiado al portapapeles!'); }).catch(function(){ prompt('Copia tu enlace:', t); });
     } else prompt('Copia tu enlace:', t);
   };
 
-  $('#mine').onchange = e => {
-    const c = getCards().find(x => x.id === e.target.value);
+  $('#mine').onchange = function(e){
+    const c = getCards().find(function(x){ return x.id === e.target.value; });
     if(!c){ refreshMine(); return; }
     const d = dec(c.e); if(!d) return toast('No se pudo cargar esa tarjeta');
     loadState(d, c.id); toast('Tarjeta cargada');
   };
 
-  $('#delc').onclick = async () => {
+  $('#delc').onclick = async function(){
     const id = ($('#mine') ? $('#mine').value : null) || cardId;
-    const a = getCards(), c = a.find(x => x.id === id);
+    const a = getCards(), c = a.find(function(x){ return x.id === id; });
     if(!c) return toast('Elige primero una tarjeta en "Mis tarjetas"');
     if(!confirm('¿Borrar la tarjeta "' + c.n + '"?\nSe eliminará de tu lista.')) return;
     const delBtn = $('#delc');
     if(delBtn){ delBtn.disabled = true; delBtn.textContent = 'Borrando…'; }
     try { await fetch(WORKER_URL + '?id=' + encodeURIComponent(id), { method: 'DELETE' }); } catch(e){}
     if(delBtn){ delBtn.disabled = false; delBtn.textContent = 'Borrar'; }
-    putCards(a.filter(x => x.id !== id));
+    putCards(a.filter(function(x){ return x.id !== id; }));
     if(id === cardId) loadState(clone(DEFAULT), null);
     else refreshMine();
     toast('Tarjeta borrada');
   };
 
-  $('#newc').onclick = () => {
-    const e = enc(S), saved = getCards().some(c => c.e === e);
+  $('#newc').onclick = function(){
+    const e = enc(S), saved = getCards().some(function(c){ return c.e === e; });
     if(e !== enc(DEFAULT) && !saved && !confirm('¿Empezar una tarjeta nueva?')) return;
     loadState(clone(DEFAULT), null); toast('Tarjeta nueva');
   };
@@ -523,7 +537,7 @@ function toast(m){
   let t = $('#toast');
   if(!t){ t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
   t.textContent = m; t.classList.add('show');
-  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3800);
+  clearTimeout(tt); tt = setTimeout(function(){ t.classList.remove('show'); }, 3800);
 }
 
 function initApp(){
@@ -535,8 +549,8 @@ function initApp(){
 
     if(id){
       fetch('cards/' + encodeURIComponent(id) + '.json?t=' + Date.now())
-        .then(r => r.ok ? r.json() : null)
-        .then(raw => {
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(raw){
           if(raw){
             const data = sanitize(raw);
             if(!editing) return startVisitor(data);
@@ -545,7 +559,7 @@ function initApp(){
           }
           startEditor(clone(DEFAULT));
         })
-        .catch(() => startEditor(clone(DEFAULT)));
+        .catch(function(){ startEditor(clone(DEFAULT)); });
       return;
     }
 
