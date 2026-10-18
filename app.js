@@ -64,13 +64,15 @@ function sanitize(o){
   if(typeof o.id === 'string' && o.id) r.id = slugify(o.id);
   if(!r.id && r.n) r.id = slugify(r.n);
   if(typeof o.d === 'string') r.d = o.d.slice(0,160);
+  
   if(typeof o.a === 'string' && o.a.trim()){
-    r.a = { m: 'url', v: o.a.trim().slice(0,400) };
+    r.a = { m: /^https?:\/\//i.test(o.a) ? 'url' : 'ig', v: o.a.trim().slice(0,400) };
   } else if(o.a && typeof o.a === 'object'){
     const val = typeof o.a.v === 'string' ? o.a.v.trim().slice(0,400) : '';
     const mode = (o.a.m === 'url' || o.a.m === 'ig') ? o.a.m : (/^https?:\/\//i.test(val) ? 'url' : 'ig');
     r.a = { m: mode, v: val };
   }
+
   r.lo = o.lo === 1 ? 1 : 0;
   if(TH[o.t]) r.t = o.t;
   if(Array.isArray(o.g)) r.g = o.g.filter(function(x){ return Array.isArray(x) && NET[x[0]]; }).slice(0,12).map(function(x){ return [x[0], String(x[1]||'').slice(0,400)]; });
@@ -126,7 +128,8 @@ function avatarURL(a){
   if(!a) return '';
   const v = (typeof a === 'string' ? a : (a.v || '')).trim();
   if(!v) return '';
-  if(a.m === 'ig' && !/^https?:\/\//i.test(v)){
+  if(!a.m || a.m === 'ig'){
+    if(/^https?:\/\//i.test(v)) return v;
     const m = v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u = m ? m[1] : v.replace(/^@/,'').split(/[\/?#\s]/)[0];
     return u ? 'https://unavatar.io/instagram/' + encodeURIComponent(u) + '?fallback=false' : '';
@@ -134,7 +137,7 @@ function avatarURL(a){
   return /^(https?:\/\/|data:image\/)/i.test(v) ? v : 'https://' + v;
 }
 
-function updateAvatar(S, cb, force) {
+function updateAvatar(S, cb){
   const img = $('#av');
   if (!img) { if (cb) cb('none'); return; }
   const avl = $('#avl');
@@ -148,17 +151,6 @@ function updateAvatar(S, cb, force) {
     return;
   }
 
-  // Si ya tiene esta misma URL asignada y está visible, no la tocamos para evitar parpadeos
-  if (img.getAttribute('src') === url && img.style.display === 'block') {
-    if (cb) cb('ok');
-    return;
-  }
-
-  if (S.a && S.a.m === 'ig' && !force && img.getAttribute('src') !== url) {
-    if (cb) cb('pending');
-    return;
-  }
-
   if (cb) cb('load');
   img.onload = function() {
     img.style.display = 'block';
@@ -169,7 +161,6 @@ function updateAvatar(S, cb, force) {
     if (cb) cb('err');
   };
   img.src = url;
-  // Si el navegador ya la tenía en caché inmediata
   if (img.complete && img.naturalWidth > 0) {
     img.style.display = 'block';
     if (cb) cb('ok');
@@ -218,7 +209,7 @@ function updateCard(S, o){
     }
   }
   applyTheme(o.themeEl, S.t);
-  updateAvatar(S, o.onAvatar, o.visitor || o.force);
+  updateAvatar(S, o.onAvatar);
   renderCloud(S, o.visitor, o.W, o.fresh);
   renderBtns(S, o.visitor);
 }
@@ -237,7 +228,7 @@ function startVisitor(S){
   }
   const root = document.documentElement;
   applyTheme(root, S.t);
-  updateCard(S, {visitor: true, force: true, W: Math.min(340, Math.max(240, innerWidth - 48)), themeEl: root});
+  updateCard(S, {visitor: true, W: Math.min(340, Math.max(240, innerWidth - 48)), themeEl: root});
 }
 
 function startEditor(S){
@@ -339,7 +330,6 @@ function startEditor(S){
     el.className = 'status' + (s === 'ok' ? ' ok' : '');
     const msgs = {
       none: photoMode === 'ig' ? 'Escribe tu usuario de Instagram y pulsa Buscar.' : 'Pega la URL directa de una imagen.',
-      pending: 'Pulsa Buscar (o Enter) para cargar la foto.',
       load: 'Buscando foto…',
       ok: 'Foto encontrada.'
     };
@@ -348,8 +338,11 @@ function startEditor(S){
 
   function save(o){
     o = o || {};
+    const avVal = $('#av-in') ? $('#av-in').value.trim() : '';
+    S.a = { m: photoMode, v: avVal };
+
     if(phone && phone.firstElementChild) phone.firstElementChild.classList.add('noanim');
-    updateCard(S, {W:W, themeEl: phone, fresh: o.fresh, force: o.force, onAvatar: setStatus});
+    updateCard(S, {W:W, themeEl: phone, fresh: o.fresh, onAvatar: setStatus});
     if(o.fresh && phone && phone.firstElementChild) phone.firstElementChild.classList.remove('noanim');
     refreshLink(); refreshWarn();
     const cnt = $('#cnt'); if(cnt) cnt.textContent = S.d.length + ' / 160';
@@ -398,9 +391,8 @@ function startEditor(S){
     $('#d').value = S.d;
     $('#av-in').value = (S.a && S.a.v) ? S.a.v : '';
     const chkLo = $('#lo'); if(chkLo) chkLo.checked = (S.lo === 1);
-    const av = $('#av'); if(av){ av.style.display = 'none'; av.removeAttribute('src'); }
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine();
-    save({force: true});
+    save();
   }
 
   loadState(S, cardId);
@@ -410,7 +402,6 @@ function startEditor(S){
   $('#d').oninput = function(e){ S.d = e.target.value; save(); };
   $('#lo').onchange = function(e){ S.lo = e.target.checked ? 1 : 0; save({fresh: true}); };
 
-  const lookup = function(){ updateAvatar(S, setStatus, true); };
   let avT;
   $('#av-in').oninput = function(e){
     const val = e.target.value.trim();
@@ -418,23 +409,20 @@ function startEditor(S){
       photoMode = 'url';
       renderSeg();
     }
-    S.a = {m: photoMode, v: val};
-    save({force: photoMode === 'url'});
+    save();
     clearTimeout(avT);
-    if(photoMode === 'ig' && val.length >= 2) avT = setTimeout(lookup, 1200);
-    else if(photoMode === 'url') lookup();
+    avT = setTimeout(function(){ updateAvatar(S, setStatus); }, 500);
   };
-  $('#av-in').onkeydown = function(e){ if(e.key === 'Enter'){ clearTimeout(avT); lookup(); } };
-  $('#av-in').onblur = function(){ clearTimeout(avT); lookup(); };
-  $('#av-go').onclick = function(){ clearTimeout(avT); lookup(); };
+  $('#av-in').onkeydown = function(e){ if(e.key === 'Enter'){ clearTimeout(avT); updateAvatar(S, setStatus); } };
+  $('#av-in').onblur = function(){ clearTimeout(avT); updateAvatar(S, setStatus); };
+  $('#av-go').onclick = function(){ clearTimeout(avT); updateAvatar(S, setStatus); };
 
   $('#seg').onclick = function(e){
     const b = e.target.closest('button'); if(!b) return;
     photoMode = b.dataset.m;
-    S.a = {m: photoMode, v: $('#av-in').value.trim()};
-    const av = $('#av'); if(av){ av.style.display = 'none'; av.removeAttribute('src'); }
     renderSeg();
-    save({force: true});
+    save();
+    updateAvatar(S, setStatus);
   };
 
   $('#themes').onclick = function(e){ const b = e.target.closest('button'); if(b){ S.t = b.dataset.t; renderThemes(); save(); } };
@@ -476,8 +464,10 @@ function startEditor(S){
     const btn = $('#savecard');
     if(!S.n || !S.n.trim()){ toast('Escribe un nombre o título en el paso 1'); const ui = $('#n'); if(ui) ui.focus(); return; }
     if(!S.id) S.id = slugify(S.n);
-    const avVal = $('#av-in').value.trim();
-    if(avVal) S.a = {m: photoMode, v: avVal};
+    
+    const avVal = $('#av-in') ? $('#av-in').value.trim() : '';
+    S.a = { m: photoMode, v: avVal };
+
     upsertCard();
     btn.disabled = true; btn.textContent = 'Guardando…';
     try {
