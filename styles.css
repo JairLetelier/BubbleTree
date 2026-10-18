@@ -17,15 +17,27 @@ a { text-decoration: none; }
 .noanim .gb, .noanim .bi { animation: none; }
 .card h1 { margin: 20px 0 0; font: 800 30px/1.1 'Bricolage Grotesque', sans-serif; letter-spacing: -.6px; text-align: center; word-break: break-word; }
 .card p { margin: 8px 0 0; max-width: 300px; text-align: center; font-size: 15px; line-height: 1.45; opacity: .92; white-space: pre-line; word-break: break-word; }
-.btns { width: 100%; margin-top: auto; padding-top: 26px; display: flex; flex-direction: column; gap: 12px; }
+.btns { width: 100%; max-width: 340px; margin: auto auto 0; padding-top: 26px; display: flex; flex-direction: column; gap: 12px; }
 .btn { height: 54px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 18px; font: 700 16px 'DM Sans', sans-serif; text-align: center; border: 1.5px solid var(--b2bd); background: var(--b2bg); color: var(--b2fg); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .btn.primary { background: var(--b1bg); color: var(--b1fg); border-color: var(--b1bg); }
 .credit { margin-top: 18px; font-size: 12px; font-weight: 700; color: var(--fg); opacity: .75; }
 @keyframes pop { 0% { transform: scale(0); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes float { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.07); } }
 @media (prefers-reduced-motion: reduce) { .gb, .bi { animation: none !important; } }
-body.visitor { background: var(--bg); min-height: 100vh; }
-body.visitor .card { width: 100%; max-width: 440px; min-height: 100vh; margin: 0 auto; padding: 56px 24px 32px; }
+
+/* VISITANTE Y FONDO MÓVIL */
+html:has(body.visitor), body.visitor {
+  margin: 0; padding: 0;
+  min-height: 100vh; min-height: 100dvh;
+  background: var(--bg);
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+body.visitor { display: flex; flex-direction: column; }
+body.visitor .card { width: 100%; max-width: 440px; min-height: 100vh; min-height: 100dvh; margin: 0 auto; padding: 56px 24px 32px; }
+
+/* EDITOR */
 .top { height: 68px; background: var(--ink); display: flex; align-items: center; gap: 20px; padding: 0 28px; }
 .logo { display: flex; align-items: center; gap: 12px; font: 800 26px 'Bricolage Grotesque', sans-serif; color: #fff; letter-spacing: -.5px; }
 .dots { position: relative; width: 44px; height: 28px; }
