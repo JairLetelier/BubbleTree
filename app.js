@@ -5,21 +5,21 @@ window.onerror = function(msg, url, line) {
   document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h3 style="color:red;">Error al cargar</h3><p>' + msg + '</p><p>Línea: ' + line + '</p></div>';
 };
 
-const WORKER_URL = '[https://tree.jairletelier23.workers.dev](https://tree.jairletelier23.workers.dev)';
+const WORKER_URL = 'https://tree.jairletelier23.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const NET = {
-  whatsapp:{n:'WhatsApp',c:'#25D366',h:'[https://wa.me/](https://wa.me/)'},
-  instagram:{n:'Instagram',c:'linear-gradient(45deg,#F9A03F,#E1306C,#7B3FE4)',h:'[https://instagram.com/](https://instagram.com/)'},
-  tiktok:{n:'TikTok',c:'#111',h:'[https://tiktok.com/](https://tiktok.com/)@'},
+  whatsapp:{n:'WhatsApp',c:'#25D366',h:'https://wa.me/'},
+  instagram:{n:'Instagram',c:'linear-gradient(45deg,#F9A03F,#E1306C,#7B3FE4)',h:'https://instagram.com/'},
+  tiktok:{n:'TikTok',c:'#111',h:'https://tiktok.com/@'},
   spotify:{n:'Spotify',c:'#1DB954'},
-  youtube:{n:'YouTube',c:'#E52D27',h:'[https://youtube.com/](https://youtube.com/)@'},
-  facebook:{n:'Facebook',c:'#1877F2',h:'[https://facebook.com/](https://facebook.com/)'},
-  x:{n:'X',c:'#111',h:'[https://x.com/](https://x.com/)'},
-  telegram:{n:'Telegram',c:'#26A5E4',h:'[https://t.me/](https://t.me/)'},
-  twitch:{n:'Twitch',c:'#9146FF',h:'[https://twitch.tv/](https://twitch.tv/)'},
+  youtube:{n:'YouTube',c:'#E52D27',h:'https://youtube.com/@'},
+  facebook:{n:'Facebook',c:'#1877F2',h:'https://facebook.com/'},
+  x:{n:'X',c:'#111',h:'https://x.com/'},
+  telegram:{n:'Telegram',c:'#26A5E4',h:'https://t.me/'},
+  twitch:{n:'Twitch',c:'#9146FF',h:'https://twitch.tv/'},
   discord:{n:'Discord',c:'#5865F2'},
-  github:{n:'GitHub',c:'#2B3137',h:'[https://github.com/](https://github.com/)'},
+  github:{n:'GitHub',c:'#2B3137',h:'https://github.com/'},
   link:{n:'Sitio web',c:'#5B3DF5'}
 };
 const GLOW = {whatsapp:'#25D366',instagram:'#E1306C',tiktok:'#69C9D0',spotify:'#1DB954',youtube:'#FF3B30',facebook:'#1877F2',x:'#fff',telegram:'#26A5E4',twitch:'#9146FF',discord:'#5865F2',github:'#fff',link:'#7C5CFF'};
@@ -72,13 +72,13 @@ function sanitize(o){
 
 function norm(k,u){
   u=(u||'').trim(); if(!u) return '';
-  if(k==='whatsapp'&&/^[+\d\s()-]{7,}$/.test(u)) return '[https://wa.me/'+u.replace(/](https://wa.me/'+u.replace(/)\D/g,'');
+  if(k==='whatsapp'&&/^[+\d\s()-]{7,}$/.test(u)) return 'https://wa.me/'+u.replace(/\D/g,'');
   if(/^(https?:\/\/|mailto:|tel:)/i.test(u)) return u;
   if(u[0]==='@' && NET[k] && NET[k].h) return NET[k].h+u.slice(1);
   return 'https://'+u.replace(/^\/+/,'');
 }
 
-const iconHTML = function(k){ return k==='link'?LINKSVG:'<img src="[https://cdn.simpleicons.org/'+k+'/white](https://cdn.simpleicons.org/'+k+'/white)" alt="" data-l="'+esc(NET[k].n[0])+'" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">'; };
+const iconHTML = function(k){ return k==='link'?LINKSVG:'<img src="https://cdn.simpleicons.org/'+k+'/white" alt="" data-l="'+esc(NET[k].n[0])+'" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">'; };
 const shuffle = function(a){ return a.sort(function(){ return Math.random()-.5; }); };
 
 function layout(n,W){
@@ -122,7 +122,7 @@ function avatarURL(a){
   if(a.m==='ig'){
     const m=v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u=m?m[1]:v.replace(/^@/,'').split(/[\/?#\s]/)[0];
-    return u?'[https://unavatar.io/instagram/'+encodeURIComponent(u)+'?fallback=false](https://unavatar.io/instagram/'+encodeURIComponent(u)+'?fallback=false)':'';
+    return u?'https://unavatar.io/instagram/'+encodeURIComponent(u)+'?fallback=false':'';
   }
   return /^https?:\/\//i.test(v)?v:'https://'+v;
 }
@@ -249,7 +249,7 @@ function startEditor(S){
      '<div class="bar">'+
        '<span class="live"><i></i>Vista previa en vivo</span>'+
        '<button class="play" id="play" type="button">▶ Probar efecto de burbujas</button>'+
-     </div>'+
+     '</div>'+
      '<div class="warn" id="warn" hidden></div>'+
      '<div class="phone" id="phone">'+cardHTML()+'</div>'+
      '<div style="font-size:13px;color:#4A465C;text-align:center">Cada cambio se refleja aquí en tiempo real.</div>'+
