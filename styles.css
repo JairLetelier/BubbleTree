@@ -96,3 +96,17 @@ textarea.in{height:70px;padding:11px 14px;resize:none}
  .panel{padding:24px 18px 40px;border-right:0}
  .themes{grid-template-columns:repeat(3,1fr)}
 }
+
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+}
+
+body.visitor {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}

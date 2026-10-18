@@ -33,7 +33,7 @@ const TH = {
 };
 const DEFAULT = {
   id: '', n:'Tu nombre', d:'Escribe aquí una descripción corta',
-  a:{m:'ig',v:''}, t:'atardecer',
+  a:{m:'ig',v:''}, t:'atardecer', lo: 0,
   g:[['instagram',''],['whatsapp',''],['tiktok',''],['spotify',''],['youtube','']],
   b:[['Catálogo PDF',''],['Tienda online','']]
 };
@@ -64,6 +64,7 @@ function sanitize(o){
   if(o.a&&typeof o.a.v==='string'){
     if(o.a.m==='ig'||o.a.m==='url') r.a={m:o.a.m,v:o.a.v.slice(0,400)};
   }
+  r.lo = o.lo === 1 ? 1 : 0;
   if(TH[o.t]) r.t=o.t;
   if(Array.isArray(o.g)) r.g=o.g.filter(function(x){ return Array.isArray(x)&&NET[x[0]]; }).slice(0,12).map(function(x){ return [x[0],String(x[1]||'').slice(0,400)]; });
   if(Array.isArray(o.b)) r.b=o.b.filter(function(x){ return Array.isArray(x); }).slice(0,8).map(function(x){ return [String(x[0]||'').slice(0,60),String(x[1]||'').slice(0,400)]; });
@@ -172,9 +173,17 @@ function renderBtns(S,visitor){
 
 function updateCard(S,o){
   o = o || {};
-  const cn=$('#cn'), cd=$('#cd');
+  const cn=$('#cn'), cd=$('#cd'), cloud=$('#cloud');
   if(cn) cn.textContent=S.n;
   if(cd){ cd.textContent=S.d; cd.style.display=S.d.trim()?'':'none'; }
+  if(cloud && cn && cd){
+    if(S.lo === 1){
+      cloud.parentNode.insertBefore(cn, cloud);
+      cloud.parentNode.insertBefore(cd, cloud);
+    } else {
+      cloud.parentNode.insertBefore(cloud, cn);
+    }
+  }
   applyTheme(o.themeEl,S.t);
   updateAvatar(S,o.onAvatar,o.visitor||o.force);
   renderCloud(S,o.visitor,o.W,o.fresh);
@@ -194,7 +203,7 @@ function startVisitor(S){
   const c=$('#card');
   if(c){
     c.classList.remove('noanim');
-    c.insertAdjacentHTML('beforeend','<a class="credit" href="'+esc(location.pathname)+'">Crea la tuya con BubbleTree</a>');
+    c.insertAdjacentHTML('beforeend','<div class="credit" style="text-align:center; padding:30px 0 20px 0; line-height:1.6;"><div style="font-size:13px; opacity:0.85; color:var(--fg);">¿Te gustaría tener tu propia página de enlaces?</div><a href="'+esc(location.pathname)+'" style="font-weight:bold; font-size:14px; text-decoration:none; color:var(--fg);">✨ Crea la tuya gratis con BubbleTree</a></div>');
   }
   const root=document.documentElement;
   applyTheme(root,S.t);
@@ -231,6 +240,7 @@ function startEditor(S){
     '<div class="sec"><div class="sh"><b>1</b>Perfil</div>'+
       '<div><label for="n">Nombre o título</label><input class="in" id="n" maxlength="60"></div>'+
       '<div><label for="d">Descripción corta <span class="cnt" id="cnt"></span></label><textarea class="in" id="d" maxlength="160"></textarea></div>'+
+      '<div><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:5px;margin-bottom:15px;font-weight:normal;color:#4A465C;"><input type="checkbox" id="lo" style="width:auto;margin:0;"> Colocar nombre y descripción justo debajo de la foto</label></div>'+
       '<div><label>Foto de perfil</label>'+
         '<div class="row" style="flex-wrap:wrap">'+
           '<div class="seg" id="seg"><button type="button" data-m="ig">Instagram</button><button type="button" data-m="url">URL</button></div>'+
@@ -315,6 +325,7 @@ function startEditor(S){
   function loadState(d,id){
     S=d; cardId=id||S.id||null; photoMode=(S.a && S.a.m==='url')?'url':'ig'; setCur();
     $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=(S.a && S.a.v ? S.a.v : '');
+    const chkLo=$('#lo'); if(chkLo) chkLo.checked=(S.lo===1);
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); 
     const av=$('#av'); if(av) av.dataset.src='';
     refreshMine(); save();
@@ -375,17 +386,13 @@ function startEditor(S){
   }
 
   $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=(S.a && S.a.v ? S.a.v : '');
+  const chkLo=$('#lo'); if(chkLo) chkLo.checked=(S.lo===1);
   renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine(); save();
   if(S.a && S.a.v) updateAvatar(S,setStatus,true);
 
-  $('#n').oninput = function(e){ 
-    S.n=e.target.value; 
-    S.id=slugify(S.n);
-    cardId=S.id||null;
-    save(); 
-  };
-  
+  $('#n').oninput = function(e){ S.n=e.target.value; S.id=slugify(S.n); cardId=S.id||null; save(); };
   $('#d').oninput = function(e){ S.d=e.target.value; save(); };
+  $('#lo').onchange = function(e){ S.lo=e.target.checked?1:0; save({fresh:true}); };
 
   const lookup = function(){ updateAvatar(S,setStatus,true); };
   let avT;
@@ -439,7 +446,7 @@ function startEditor(S){
   $('#play').onclick = function(){ save({fresh:true}); };
   $('#vis').onclick = function(){
     const m=missingCount(); if(m.g||m.b) toast('Ojo: los elementos sin enlace no se mostrarán');
-    window.open(getActiveLink(),'_blank');
+    window.open(getBaseUrl() + '?d=' + enc(S), '_blank');
   };
 
   $('#savecard').onclick = async function(){
