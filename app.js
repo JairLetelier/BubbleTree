@@ -128,19 +128,41 @@ function avatarURL(a){
   return /^https?:\/\//i.test(v)?v:'https://'+v;
 }
 
-function updateAvatar(S,cb,force){
-  const img=$('#av'); if(!img) { if(cb) cb('none'); return; }
-  const avl=$('#avl'); if(avl) avl.textContent=(S.n||'?').trim().charAt(0).toUpperCase()||'?';
-  const url=avatarURL(S.a);
-  if(!url){ img.style.display='none'; img.removeAttribute('src'); if(cb) cb('none'); return; }
-  if(img.dataset.src===url) return;
-  if(S.a && S.a.m==='ig' && force!==true){ if(cb) cb('pending'); return; }
-  img.dataset.src=url;
-  img.onload=function(){ img.style.display='block'; if(cb) cb('ok'); };
-  img.onerror=function(){ img.style.display='none'; if(cb) cb('err'); };
-  if(cb) cb('load');
-  img.referrerPolicy='no-referrer';
-  img.src=url;
+function updateAvatar(S, cb, force) {
+  const img = $('#av'); 
+  if (!img) { if (cb) cb('none'); return; }
+  const avl = $('#avl'); 
+  if (avl) avl.textContent = (S.n || '?').trim().charAt(0).toUpperCase() || '?';
+  
+  const url = avatarURL(S.a);
+  if (!url) { 
+    img.style.display = 'none'; 
+    img.removeAttribute('src'); 
+    if (cb) cb('none'); 
+    return; 
+  }
+  
+  // Si la imagen ya está cargada con esta misma URL, forzamos que se muestre y detenemos la ejecución
+  if (img.getAttribute('src') === url) {
+     if (img.complete && img.naturalHeight > 0) {
+        img.style.display = 'block';
+        if (cb) cb('ok');
+     } else {
+        if (cb) cb('load');
+     }
+     return;
+  }
+  
+  if (S.a && S.a.m === 'ig' && force !== true) { 
+    if (cb) cb('pending'); 
+    return; 
+  }
+  
+  img.onload = function() { img.style.display = 'block'; if (cb) cb('ok'); };
+  img.onerror = function() { img.style.display = 'none'; if (cb) cb('err'); };
+  if (cb) cb('load');
+  img.referrerPolicy = 'no-referrer';
+  img.setAttribute('src', url);
 }
 
 function renderCloud(S,visitor,W,fresh){
@@ -327,7 +349,7 @@ function startEditor(S){
     $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=(S.a && S.a.v ? S.a.v : '');
     const chkLo=$('#lo'); if(chkLo) chkLo.checked=(S.lo===1);
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); 
-    const av=$('#av'); if(av) av.dataset.src='';
+    const av=$('#av'); if(av) av.removeAttribute('src');
     refreshMine(); save();
     if(S.a && S.a.v) updateAvatar(S,setStatus,true);
   }
@@ -408,7 +430,7 @@ function startEditor(S){
   $('#seg').onclick = function(e){
     const b=e.target.closest('button'); if(!b) return;
     photoMode=b.dataset.m; S.a={m:photoMode,v:$('#av-in').value};
-    renderSeg(); const av=$('#av'); if(av) av.dataset.src=''; save(); if(photoMode!=='ig') lookup();
+    renderSeg(); const av=$('#av'); if(av) av.removeAttribute('src'); save(); if(photoMode!=='ig') lookup();
   };
 
   $('#themes').onclick = function(e){
