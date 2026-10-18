@@ -1,13 +1,11 @@
 (function(){
 'use strict';
 
-// Escudo anti-pantalla blanca
 window.onerror = function(msg, url, line) {
   document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h3 style="color:red;">Error al cargar</h3><p>' + msg + '</p><p>Línea: ' + line + '</p></div>';
 };
 
-// URL configurada de tu Cloudflare Worker
-const WORKER_URL = 'tree.jairletelier23.workers.dev';
+const WORKER_URL = 'https://tree.jairletelier23.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const NET = {
@@ -245,13 +243,13 @@ function startEditor(S){
     '<div class="sec"><div class="sh"><b>2</b>Tema</div><div class="themes" id="themes"></div></div>'+
     '<div class="sec"><div class="sh"><b>3</b>Burbujas de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">'+catHTML+'</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>'+
     '<div class="sec"><div class="sh"><b>4</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>'+
-    '<div class="note"><span>Toca "Guardar" para almacenar tu tarjeta. Tu enlace final se generará automáticamente a partir del nombre de tu perfil.</span></div>'+
+    '<div class="note"><span>Toca "Guardar" para almacenar tu tarjeta en GitHub con tu enlace personalizado.</span></div>'+
    '</div>'+
    '<div class="stage">'+
      '<div class="bar">'+
        '<span class="live"><i></i>Vista previa en vivo</span>'+
        '<button class="play" id="play" type="button">▶ Probar efecto de burbujas</button>'+
-     '</div>'+
+     </div>'+
      '<div class="warn" id="warn" hidden></div>'+
      '<div class="phone" id="phone">'+cardHTML()+'</div>'+
      '<div style="font-size:13px;color:#4A465C;text-align:center">Cada cambio se refleja aquí en tiempo real.</div>'+
@@ -455,7 +453,6 @@ function startEditor(S){
     if(!S.id) S.id = slugify(S.n);
 
     upsertCard();
-
     btn.disabled=true; btn.textContent='Guardando…';
 
     try {
@@ -467,15 +464,15 @@ function startEditor(S){
       const data = await res.json();
       btn.disabled=false; btn.textContent='💾 Guardar';
 
-      if(res.ok && data.ok){
+      if(data && data.ok){
         refreshLink();
-        toast('¡Tarjeta guardada!');
+        toast('¡Tarjeta guardada en GitHub!');
       } else {
-        toast('Error al guardar: ' + (data.error || 'Revisa tu Worker'));
+        toast('Error: ' + (data.error || 'No se pudo guardar'));
       }
     } catch(err) {
       btn.disabled=false; btn.textContent='💾 Guardar';
-      toast('No se pudo conectar con el servidor');
+      toast('Error: ' + err.message);
     }
   };
 
@@ -529,7 +526,6 @@ function toast(m){
   clearTimeout(tt); tt=setTimeout(function(){ t.classList.remove('show'); }, 3800);
 }
 
-/* ================= ARRANQUE SEGURO ================= */
 function initApp(){
   try {
     const params = new URLSearchParams(window.location.search);
