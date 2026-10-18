@@ -26,10 +26,6 @@ a{text-decoration:none}
 @keyframes float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-8px) scale(1.07)}}
 @media (prefers-reduced-motion:reduce){.gb,.bi{animation:none !important}}
 
-/* VISITANTE */
-body.visitor{background:var(--bg);min-height:100vh}
-body.visitor .card{width:100%;max-width:440px;min-height:100vh;margin:0 auto;padding:56px 24px 32px}
-
 /* EDITOR */
 .top{height:68px;background:var(--ink);display:flex;align-items:center;gap:20px;padding:0 28px}
 .logo{display:flex;align-items:center;gap:12px;font:800 26px 'Bricolage Grotesque',sans-serif;color:#fff;letter-spacing:-.5px}
@@ -89,6 +85,7 @@ textarea.in{height:70px;padding:11px 14px;resize:none}
 .gb.ghost .bi,.btn.ghost{opacity:.5;border-style:dashed}
 .toast{position:fixed;max-width:90vw;text-align:center;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--ink);color:var(--lime);font-weight:700;padding:12px 22px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:9}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
 @media (max-width:960px){
  .top{height:auto;flex-wrap:wrap;padding:14px 16px;gap:12px}
  .linkbox{order:3;flex-basis:100%}
@@ -97,16 +94,23 @@ textarea.in{height:70px;padding:11px 14px;resize:none}
  .themes{grid-template-columns:repeat(3,1fr)}
 }
 
-html, body {
+/* VISITANTE - FONDO FIJO PARA CELULARES */
+html {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg);
-  margin: 0;
-  padding: 0;
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 body.visitor {
-  display: flex;
-  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
   min-height: 100dvh;
+  background: var(--bg);
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
