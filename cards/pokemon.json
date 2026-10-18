@@ -1,0 +1,34 @@
+{
+  "id": "pokemon",
+  "n": "Pokemon",
+  "d": "⚡ ¡Bienvenido al mundo Pokémon! ⚡\n\n🐾 En nuestra tienda encontrarás una gran variedad de figuras, coleccionables y artículos de Pokémon para fanáticos de todas ",
+  "a": {
+    "m": "url",
+    "v": "https://scontent.cdninstagram.com/v/t51.82787-19/791757615_18614340670041411_7851834502896727559_n.jpg?stp=dst-jpg_s150x150_tt6&_nc_cat=1&ccb=7-5&_nc_sid=f7ccc5&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy4xMDI0LkMzIn0%3D&_nc_ohc=OeNWyLi-Sa0Q7kNvwGdgu9_&_nc_oc=AdrhB88qqTmZY0I047YdWHM49gBnt0DnNRvEaF7gEXZM-wLzsG2V7HYHPLcRp4FMtAM&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&_nc_gid=Xwe5mk7Nb3qOjsq3FCa4kQ&_nc_ss=7b689&oh=00_AQMhE4SJPRsZii5DHo502ycNUfQE3luMCWR-EBgMHZtrQw&oe=6ADB2504"
+  },
+  "t": "atardecer",
+  "g": [
+    [
+      "instagram",
+      "https://www.instagram.com/pokemon/?hl=es"
+    ],
+    [
+      "whatsapp",
+      "+56966090357"
+    ],
+    [
+      "youtube",
+      "https://www.youtube.com/watch?v=JhUqf_fhgeA"
+    ]
+  ],
+  "b": [
+    [
+      "Catálogo PDF",
+      "https://irion.cl/collections/pokemon-coleccion?srsltid=AU7gw4X_s9pYqiQE6CXeBQYXfYREpg1iU1sfMsNaQ2vnv4_izB4kJPGG"
+    ],
+    [
+      "Tienda",
+      "https://irion.cl/"
+    ]
+  ]
+}
