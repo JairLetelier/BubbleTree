@@ -7,7 +7,7 @@ window.onerror = function(msg, url, line) {
 };
 
 // URL configurada de tu Cloudflare Worker
-const WORKER_URL = 'https://bubbletree.jairletelier23.workers.dev';
+const WORKER_URL = 'tree.jairletelier23.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const NET = {
