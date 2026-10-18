@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-// PEGA AQUÍ LA URL DE TU WORKER DE CLOUDFLARE:
+// REEMPLAZA ESTA URL CON LA DE TU WORKER CUANDO LO TENGAS LISTO:
 const WORKER_URL = 'https://bubbletree-api.tunombre.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
@@ -211,14 +211,14 @@ function startEditor(S){
       </div>
     </div>
     <div class="sec"><div class="sh"><b>3</b>Tema</div><div class="themes" id="themes"></div></div>
-    <div class="sec"><div class="sh"><b>4</b>Globos de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
+    <div class="sec"><div class="sh"><b>4</b>Burbujas de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
     <div class="sec"><div class="sh"><b>5</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
     <div class="note"><span>Toca "Guardar en Git" para almacenar de por vida tu tarjeta. Tu enlace final quedará corto y limpio con tu nombre único.</span></div>
    </div>
    <div class="stage">
      <div class="bar">
        <span class="live"><i></i>Vista previa en vivo</span>
-       <button class="play" id="play" type="button">▶ Probar efecto de globos</button>
+       <button class="play" id="play" type="button">▶ Probar efecto de burbujas</button>
      </div>
      <div class="warn" id="warn" hidden></div>
      <div class="phone" id="phone">${cardHTML()}</div>
@@ -266,7 +266,7 @@ function startEditor(S){
 
   function refreshWarn(){
     const m=missingCount(), el=$('#warn'), p=[];
-    if(m.g) p.push(`${m.g} globo${m.g===1?'':'s'}`);
+    if(m.g) p.push(`${m.g} burbuja${m.g===1?'':'s'}`);
     if(m.b) p.push(`${m.b} botón${m.b===1?'':'es'}`);
     el.hidden=!p.length;
     if(p.length) el.textContent=`Sin enlace: ${p.join(' y ')} (se ven apagados aquí). Tus visitantes no los verán hasta que les pongas un enlace.`;
@@ -316,7 +316,7 @@ function startEditor(S){
   }
 
   function renderGlobos(){
-    $('#gl').innerHTML=S.g.map((g,i)=>`<div class="item"><span class="ic" style="background:${NET[g[0]].c}">${iconHTML(g[0])}</span><input class="in" data-gi="${i}" aria-label="Enlace de ${esc(NET[g[0]].n)}" placeholder="${g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace'}" value="${esc(g[1])}"><button class="x" type="button" data-gx="${i}" aria-label="Quitar ${esc(NET[g[0]].n)}">✕</button></div>`).join('')||'<div class="status">Aún no hay globos. Toca un logo arriba.</div>';
+    $('#gl').innerHTML=S.g.map((g,i)=>`<div class="item"><span class="ic" style="background:${NET[g[0]].c}">${iconHTML(g[0])}</span><input class="in" data-gi="${i}" aria-label="Enlace de ${esc(NET[g[0]].n)}" placeholder="${g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace'}" value="${esc(g[1])}"><button class="x" type="button" data-gx="${i}" aria-label="Quitar ${esc(NET[g[0]].n)}">✕</button></div>`).join('')||'<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
   }
 
   function renderBtnsList(){
@@ -362,7 +362,7 @@ function startEditor(S){
 
   $('#cat').onclick = e => {
     const b=e.target.closest('button'); if(!b) return;
-    if(S.g.length>=12){ toast('Máximo 12 globos'); return; }
+    if(S.g.length>=12){ toast('Máximo 12 burbujas'); return; }
     S.g.push([b.dataset.add,'']); renderGlobos(); save();
     const ins=document.querySelectorAll('#gl input'); ins[ins.length-1]?.focus();
   };
@@ -392,7 +392,6 @@ function startEditor(S){
     window.open(getActiveLink(),'_blank');
   };
 
-  // Guardar a través del Microservicio en Cloudflare hacia GitHub
   $('#savecard').onclick = async () => {
     const btn=$('#savecard');
     if(!S.id){
@@ -402,6 +401,13 @@ function startEditor(S){
     }
 
     upsertCard();
+
+    if(!WORKER_URL || WORKER_URL.includes('tunombre.workers.dev')){
+      refreshLink();
+      toast('Tarjeta guardada localmente. Configura WORKER_URL para sincronizar con GitHub.');
+      return;
+    }
+
     btn.disabled=true; btn.textContent='Guardando en Git…';
 
     try {
@@ -421,13 +427,12 @@ function startEditor(S){
       }
     } catch(err) {
       btn.disabled=false; btn.textContent='💾 Guardar en Git';
-      toast('No se pudo conectar con el servicio Cloudflare');
+      toast('No se pudo conectar con Cloudflare Worker');
     }
   };
 
-  // Copiar el enlace directo limpio
   $('#copy').onclick = () => {
-    copyText(getActiveLink(), '¡Enlace corto copiado al portapapeles!');
+    copyText(getActiveLink(), '¡Enlace copiado al portapapeles!');
   };
 
   $('#mine').onchange = e => {
@@ -437,26 +442,25 @@ function startEditor(S){
     loadState(d,c.id); toast('Tarjeta cargada');
   };
 
-  // Borrar tanto localmente como del repositorio mediante el Worker
   $('#delc').onclick = async () => {
     const id=$('#mine').value||cardId, a=getCards(), c=a.find(x=>x.id===id);
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
-    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista y del repositorio en Git.`)) return;
+    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista local y del repositorio.`)) return;
     
-    $('#delc').disabled = true;
-    $('#delc').textContent = 'Borrando…';
-
-    try {
-      await fetch(`${WORKER_URL}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
-    } catch(e){}
-
-    $('#delc').disabled = false;
-    $('#delc').textContent = 'Borrar';
+    if(WORKER_URL && !WORKER_URL.includes('tunombre.workers.dev')){
+      $('#delc').disabled = true;
+      $('#delc').textContent = 'Borrando…';
+      try {
+        await fetch(`${WORKER_URL}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch(e){}
+      $('#delc').disabled = false;
+      $('#delc').textContent = 'Borrar';
+    }
 
     putCards(a.filter(x=>x.id!==id));
     if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null);
     else refreshMine();
-    toast('Tarjeta borrada de tu lista y de GitHub');
+    toast('Tarjeta borrada');
   };
 
   $('#newc').onclick = () => {
@@ -474,29 +478,33 @@ function toast(m){
 
 /* ================= ARRANQUE ================= */
 async function bootstrap(){
-  const params = new URLSearchParams(location.search);
-  const id = params.get('id');
-  const d = params.get('d') || location.hash.slice(1);
-  const editing = params.has('edit');
+  try {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const d = params.get('d') || location.hash.slice(1);
+    const editing = params.has('edit');
 
-  // Carga por ID directo desde el repositorio en GitHub
-  if(id){
-    try {
-      const res = await fetch(`cards/${id}.json`);
-      if(res.ok){
-        const cardData = await res.json();
-        if(!editing) return startVisitor(cardData);
-        cardData.__fromLink = 1;
-        return startEditor(cardData);
-      }
-    } catch(e){}
+    if(id){
+      try {
+        const res = await fetch(`cards/${encodeURIComponent(id)}.json`);
+        if(res.ok){
+          const cardData = await res.json();
+          if(!editing) return startVisitor(cardData);
+          cardData.__fromLink = 1;
+          return startEditor(cardData);
+        }
+      } catch(e){}
+    }
+
+    const fromLink = d ? dec(d) : null;
+    if(fromLink && !editing) return startVisitor(fromLink);
+    if(fromLink && editing){ fromLink.__fromLink=1; return startEditor(fromLink); }
+
+    startEditor(JSON.parse(JSON.stringify(DEFAULT)));
+  } catch(err) {
+    // Si algo inesperado falla, fuerza la apertura limpia del editor
+    startEditor(JSON.parse(JSON.stringify(DEFAULT)));
   }
-
-  // Carga alternativa si viene con datos en el enlace
-  const fromLink = d ? dec(d) : null;
-  if(fromLink && !editing) startVisitor(fromLink);
-  else if(fromLink && editing){ fromLink.__fromLink=1; startEditor(fromLink); }
-  else startEditor(JSON.parse(JSON.stringify(DEFAULT)));
 }
 
 bootstrap();
