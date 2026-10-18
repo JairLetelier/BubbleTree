@@ -1,6 +1,9 @@
 (function(){
 'use strict';
 
+// PEGA AQUÍ LA URL DE TU WORKER DE CLOUDFLARE:
+const WORKER_URL = 'https://bubbletree-api.tunombre.workers.dev';
+
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const NET = {
   whatsapp:{n:'WhatsApp',c:'#25D366',h:'https://wa.me/'},
@@ -26,7 +29,7 @@ const TH = {
   pastel:{n:'Pastel',bg:'linear-gradient(170deg,#FFD9E8,#D9E4FF)',fg:'#15131F',b1:['#15131F','#fff'],b2:['rgba(255,255,255,.7)','#15131F','#15131F']}
 };
 const DEFAULT = {
-  n:'Tu nombre', d:'Escribe aquí una descripción corta',
+  id: '', n:'Tu nombre', d:'Escribe aquí una descripción corta',
   a:{m:'ig',v:''}, t:'atardecer',
   g:[['instagram',''],['whatsapp',''],['tiktok',''],['spotify',''],['youtube','']],
   b:[['Catálogo PDF',''],['Tienda online','']]
@@ -46,6 +49,7 @@ function dec(s){
 function sanitize(o){
   const r = JSON.parse(JSON.stringify(DEFAULT));
   if(!o||typeof o!=='object') return r;
+  if(typeof o.id==='string') r.id=o.id.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
   if(typeof o.n==='string') r.n=o.n.slice(0,60);
   if(typeof o.d==='string') r.d=o.d.slice(0,160);
   if(o.a&&typeof o.a.v==='string'){
@@ -161,17 +165,17 @@ function updateCard(S,o={}){
 
 function startVisitor(S){
   document.body.classList.add('visitor');
-  document.title=S.n||'globos';
+  document.title=S.n||'BubbleTree';
   $('#app').innerHTML=cardHTML();
   const c=$('#card'); c.classList.remove('noanim');
-  c.insertAdjacentHTML('beforeend',`<a class="credit" href="${esc(location.pathname)}">Crea la tuya con globos</a>`);
+  c.insertAdjacentHTML('beforeend',`<a class="credit" href="${esc(location.pathname)}">Crea la tuya con BubbleTree</a>`);
   const root=document.documentElement;
   applyTheme(root,S.t);
   updateCard(S,{visitor:true,W:Math.min(340,Math.max(240,innerWidth-48)),themeEl:root});
 }
 
 function startEditor(S){
-  let photoMode=S.a.m==='url'?'url':'ig', shortInfo=null, cardId=localStorage.getItem('globos-cur')||null;
+  let photoMode=S.a.m==='url'?'url':'ig', cardId=localStorage.getItem('globos-cur')||null;
   try{ const raw=localStorage.getItem('globos-draft'); if(raw&&!S.__fromLink){ const d=dec(raw); if(d) S=d; } }catch{}
   delete S.__fromLink; photoMode=S.a.m==='url'?'url':'ig';
 
@@ -179,19 +183,22 @@ function startEditor(S){
 
   $('#app').innerHTML=
   `<div class="top">
-    <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>globos</div>
+    <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>BubbleTree</div>
     <div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>
     <select class="tb sel" id="mine" aria-label="Mis tarjetas"></select>
-    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5;color:#fff;font-weight:700">💾 Guardar y generar link</button>
+    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5;color:#fff;font-weight:700">💾 Guardar en Git</button>
     <button class="copy" id="copy" type="button">Copiar enlace</button>
-    <button class="tb" id="ghcfg" type="button" title="Configurar GitHub">⚙ Configurar Git</button>
     <button class="tb" id="newc" type="button">Nueva</button>
     <button class="tb" id="delc" type="button">Borrar</button>
     <button class="tb" id="vis" type="button">Vista previa</button>
   </div>
   <div class="split">
    <div class="panel">
-    <div class="sec"><div class="sh"><b>1</b>Perfil</div>
+    <div class="sec"><div class="sh"><b>1</b>Identificador del enlace</div>
+      <div><label for="uid">Nombre único para tu URL (ejemplo: miperfil)</label>
+      <input class="in" id="uid" maxlength="30" placeholder="miperfil" value="${esc(S.id||'')}"></div>
+    </div>
+    <div class="sec"><div class="sh"><b>2</b>Perfil</div>
       <div><label for="n">Nombre o título</label><input class="in" id="n" maxlength="60"></div>
       <div><label for="d">Descripción corta <span class="cnt" id="cnt"></span></label><textarea class="in" id="d" maxlength="160"></textarea></div>
       <div><label>Foto de perfil</label>
@@ -203,16 +210,15 @@ function startEditor(S){
         <div class="status" id="avs"></div>
       </div>
     </div>
-    <div class="sec"><div class="sh"><b>2</b>Tema</div><div class="themes" id="themes"></div></div>
-    <div class="sec"><div class="sh"><b>3</b>Globos de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
-    <div class="sec"><div class="sh"><b>4</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
-    <div class="note"><span>Toca "Guardar y generar link" para almacenar tu tarjeta. Una vez generado, puedes usar "Copiar enlace" cuando lo necesites.</span></div>
+    <div class="sec"><div class="sh"><b>3</b>Tema</div><div class="themes" id="themes"></div></div>
+    <div class="sec"><div class="sh"><b>4</b>Globos de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
+    <div class="sec"><div class="sh"><b>5</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
+    <div class="note"><span>Toca "Guardar en Git" para almacenar de por vida tu tarjeta. Tu enlace final quedará corto y limpio con tu nombre único.</span></div>
    </div>
    <div class="stage">
      <div class="bar">
        <span class="live"><i></i>Vista previa en vivo</span>
        <button class="play" id="play" type="button">▶ Probar efecto de globos</button>
-       <label class="chk"><input type="checkbox" id="shortOn" checked> Acortar enlace al guardar</label>
      </div>
      <div class="warn" id="warn" hidden></div>
      <div class="phone" id="phone">${cardHTML()}</div>
@@ -220,28 +226,27 @@ function startEditor(S){
    </div>
   </div>`;
 
-  const phone=$('#phone'), W=276, CK='globos-cards', GHK='globos-gh-config';
+  const phone=$('#phone'), W=276, CK='globos-cards';
   const getCards = () => { try{ return JSON.parse(localStorage.getItem(CK))||[]; }catch{ return []; } };
   const putCards = a => localStorage.setItem(CK,JSON.stringify(a.slice(0,50)));
   const setCur = () => cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur');
 
-  function getGH(){ try{ return JSON.parse(localStorage.getItem(GHK))||null; }catch{ return null; } }
-
-  function longLink(){
-    const base = (location.protocol==='file:'||location.origin==='null') 
+  function getBaseUrl(){
+    return (location.protocol==='file:'||location.origin==='null') 
       ? location.href.split(/[?#]/)[0] 
       : location.origin + location.pathname;
-    return `${base}?d=${enc(S)}`;
   }
 
-  const shortFor = () => shortInfo?.e===enc(S)?shortInfo.u:null;
+  function getActiveLink(){
+    const targetId = S.id || cardId;
+    if(targetId) return `${getBaseUrl()}?id=${encodeURIComponent(targetId)}`;
+    return `${getBaseUrl()}?d=${enc(S)}`;
+  }
 
   function refreshLink(){
-    const s=shortFor();
-    if(s){ $('#lk').innerHTML=`<span style="color:#D4FF4F">${esc(s.replace(/^https?:\/\//,''))}</span>`; $('#sz').textContent='corto'; return; }
-    const l=longLink(), i=l.indexOf('?d=');
-    $('#lk').innerHTML=`${esc(l.slice(0,i+3).replace(/^https?:\/\//,''))}<span style="color:#8F86B8">${esc(l.slice(i+3))}</span>`;
-    $('#sz').textContent=(l.length/1024).toFixed(1).replace('.',',')+' KB';
+    const l = getActiveLink();
+    $('#lk').innerHTML=`<span style="color:#D4FF4F">${esc(l.replace(/^https?:\/\//,''))}</span>`;
+    $('#sz').textContent='directo';
   }
 
   function refreshMine(){
@@ -251,72 +256,10 @@ function startEditor(S){
   }
 
   function upsertCard(){
-    const a=getCards(); if(!cardId) cardId='c'+Date.now().toString(36);
+    const a=getCards(); if(!cardId) cardId=S.id || ('c'+Date.now().toString(36));
     let c=a.find(x=>x.id===cardId); if(!c){ c={id:cardId}; a.unshift(c); }
-    c.n=S.n||'Sin nombre'; c.e=enc(S); c.sh=shortFor()?shortInfo:null;
+    c.n=S.n||'Sin nombre'; c.e=enc(S);
     putCards(a); setCur(); refreshMine();
-  }
-
-  // Guardado permanente en el repositorio de GitHub
-  async function saveToGitHub(){
-    const gh = getGH();
-    if(!gh || !gh.token || !gh.user || !gh.repo) return false;
-    try {
-      const fileName = `cards/${cardId || 'card'}.json`;
-      const url = `https://api.github.com/repos/${gh.user}/${gh.repo}/contents/${fileName}`;
-      let sha = null;
-      try {
-        const check = await fetch(url, { headers: { Authorization: `token ${gh.token}`, Accept: 'application/vnd.github.v3+json' } });
-        if(check.ok){ const dat = await check.json(); sha = dat.sha; }
-      } catch(e){}
-
-      const content = btoa(unescape(encodeURIComponent(JSON.stringify(S, null, 2))));
-      const body = { message: `Guardar tarjeta: ${S.n || 'card'}`, content };
-      if(sha) body.sha = sha;
-
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: { Authorization: `token ${gh.token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      return res.ok;
-    } catch(err){
-      return false;
-    }
-  }
-
-  function jsonp(url,ms=7000){
-    return new Promise(res=>{
-      const cb='gcb'+Math.random().toString(36).slice(2), s=document.createElement('script'); let done=false;
-      const end=v=>{ if(done)return; done=true; clearTimeout(t); delete window[cb]; s.remove(); res(v); };
-      const t=setTimeout(()=>end(null),ms);
-      window[cb]=d=>end(d); s.onerror=()=>end(null); s.src=`${url}&callback=${cb}`;
-      document.head.appendChild(s);
-    });
-  }
-
-  async function getShort(l){
-    if(location.protocol==='file:'){
-      return {err:'Publica tu proyecto en GitHub Pages para acortar enlaces.'};
-    }
-    try{
-      const d = await jsonp(`https://is.gd/create.php?format=json&url=${encodeURIComponent(l)}`, 6000);
-      if(d?.shorturl) return {u:d.shorturl};
-    }catch{}
-
-    try{
-      const d = await jsonp(`https://v.gd/create.php?format=json&url=${encodeURIComponent(l)}`, 6000);
-      if(d?.shorturl) return {u:d.shorturl};
-    }catch{}
-
-    try{
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(l))}`;
-      const res = await fetch(proxyUrl);
-      const txt = (await res.text()).trim();
-      if(/^https?:\/\/\S+$/.test(txt)) return {u:txt};
-    }catch{}
-
-    return {err:'Servidores de acortado temporalmente ocupados'};
   }
 
   const missingCount = () => ({ g:S.g.filter(x=>!norm(x[0],x[1])).length, b:S.b.filter(x=>x[0].trim()&&!norm('',x[1])).length });
@@ -331,9 +274,9 @@ function startEditor(S){
 
   const copyText = (t,msg) => navigator.clipboard?.writeText(t).then(()=>toast(msg),()=>prompt('Copia tu enlace:',t)) || prompt('Copia tu enlace:',t);
 
-  function loadState(d,id,sh){
-    S=d; cardId=id||null; shortInfo=sh||null; photoMode=S.a.m==='url'?'url':'ig'; setCur();
-    $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
+  function loadState(d,id){
+    S=d; cardId=id||S.id||null; photoMode=S.a.m==='url'?'url':'ig'; setCur();
+    $('#uid').value=S.id\vert{}\vert{}''; $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); $('#av').dataset.src=''; refreshMine(); save();
     if(S.a.v) updateAvatar(S,setStatus,true);
   }
@@ -379,6 +322,14 @@ function startEditor(S){
   function renderBtnsList(){
     $('#bl').innerHTML=S.b.map((b,i)=>`<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="${i}" aria-label="Texto del botón ${i+1}" maxlength="60" value="${esc(b[0])}"><input class="in" data-bu="${i}" aria-label="Enlace del botón ${i+1}" placeholder="https://…" value="${esc(b[1])}"><button class="x" type="button" data-bx="${i}" aria-label="Quitar botón ${i+1}">✕</button></div>`).join('');
   }
+
+  $('#uid').oninput = e => {
+    const clean = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
+    e.target.value = clean;
+    S.id = clean;
+    cardId = clean || null;
+    save();
+  };
 
   $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
   renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine(); save();
@@ -438,81 +389,80 @@ function startEditor(S){
   $('#play').onclick = () => save({fresh:true});
   $('#vis').onclick = () => {
     const m=missingCount(); if(m.g||m.b) toast('Ojo: los elementos sin enlace no se mostrarán a los visitantes');
-    window.open(longLink(),'_blank');
+    window.open(getActiveLink(),'_blank');
   };
 
-  // Botón GUARDAR: Guarda localmente, en Git (si está configurado) y genera el link
+  // Guardar a través del Microservicio en Cloudflare hacia GitHub
   $('#savecard').onclick = async () => {
-    const btn=$('#savecard'), long=longLink();
+    const btn=$('#savecard');
+    if(!S.id){
+      toast('Escribe primero un identificador en el paso 1');
+      $('#uid').focus();
+      return;
+    }
+
     upsertCard();
+    btn.disabled=true; btn.textContent='Guardando en Git…';
 
-    btn.disabled=true; btn.textContent='Guardando…';
-    const savedInGit = await saveToGitHub();
+    try {
+      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(S.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(S)
+      });
+      const data = await res.json();
+      btn.disabled=false; btn.textContent='💾 Guardar en Git';
 
-    if($('#shortOn').checked){
-      btn.textContent='Acortando…';
-      const s = await getShort(long);
-      btn.disabled=false; btn.textContent='💾 Guardar y generar link';
-      if(s.u){
-        shortInfo={e:enc(S),u:s.u};
-        upsertCard();
+      if(res.ok && data.ok){
         refreshLink();
-        toast('¡Tarjeta guardada' + (savedInGit ? ' en Git' : '') + ' y enlace generado!');
-        return;
+        toast('¡Tarjeta guardada de por vida en GitHub!');
+      } else {
+        toast('Error al guardar: ' + (data.error || 'Revisa tu Worker'));
       }
+    } catch(err) {
+      btn.disabled=false; btn.textContent='💾 Guardar en Git';
+      toast('No se pudo conectar con el servicio Cloudflare');
     }
-
-    btn.disabled=false; btn.textContent='💾 Guardar y generar link';
-    refreshLink();
-    toast('¡Tarjeta guardada' + (savedInGit ? ' en Git de por vida!' : '!'));
   };
 
-  // Botón COPIAR: Exclusivamente copia el enlace activo sin re-guardar
+  // Copiar el enlace directo limpio
   $('#copy').onclick = () => {
-    const activeLink = shortFor() || longLink();
-    copyText(activeLink, '¡Enlace copiado al portapapeles!');
-  };
-
-  // Configuración de GitHub para almacenamiento persistente
-  $('#ghcfg').onclick = () => {
-    const cur = getGH() || { user:'', repo:'', token:'' };
-    const user = prompt('Tu usuario de GitHub:', cur.user);
-    if(user === null) return;
-    const repo = prompt('Nombre del repositorio (ej: BubbleTree):', cur.repo || 'BubbleTree');
-    if(repo === null) return;
-    const token = prompt('Token Personal de GitHub (con permiso "repo"):', cur.token);
-    if(token === null) return;
-
-    if(user.trim() && repo.trim() && token.trim()){
-      localStorage.setItem(GHK, JSON.stringify({ user: user.trim(), repo: repo.trim(), token: token.trim() }));
-      toast('GitHub vinculado. Se guardará de por vida en tu repo.');
-    } else {
-      localStorage.removeItem(GHK);
-      toast('Configuración de Git eliminada.');
-    }
+    copyText(getActiveLink(), '¡Enlace corto copiado al portapapeles!');
   };
 
   $('#mine').onchange = e => {
     const c=getCards().find(x=>x.id===e.target.value);
     if(!c){ refreshMine(); return; }
     const d=dec(c.e); if(!d){ toast('No se pudo cargar esa tarjeta'); return; }
-    loadState(d,c.id,c.sh); toast('Tarjeta cargada');
+    loadState(d,c.id); toast('Tarjeta cargada');
   };
 
-  $('#delc').onclick = () => {
+  // Borrar tanto localmente como del repositorio mediante el Worker
+  $('#delc').onclick = async () => {
     const id=$('#mine').value||cardId, a=getCards(), c=a.find(x=>x.id===id);
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
-    if(!confirm(`¿Borrar la tarjeta "${c.n}" de tu lista?`)) return;
+    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista y del repositorio en Git.`)) return;
+    
+    $('#delc').disabled = true;
+    $('#delc').textContent = 'Borrando…';
+
+    try {
+      await fetch(`${WORKER_URL}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch(e){}
+
+    $('#delc').disabled = false;
+    $('#delc').textContent = 'Borrar';
+
     putCards(a.filter(x=>x.id!==id));
-    if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null);
+    if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null);
     else refreshMine();
-    toast('Tarjeta borrada');
+    toast('Tarjeta borrada de tu lista y de GitHub');
   };
 
   $('#newc').onclick = () => {
     const e=enc(S), saved=getCards().some(c=>c.e===e);
     if(e!==enc(DEFAULT)&&!saved&&!confirm('¿Empezar una tarjeta nueva?')) return;
-    loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null); toast('Tarjeta nueva');
+    loadState(JSON.parse(JSON.stringify(DEFAULT)),null); toast('Tarjeta nueva');
   };
 }
 
@@ -523,12 +473,31 @@ function toast(m){
 }
 
 /* ================= ARRANQUE ================= */
-const params = new URLSearchParams(location.search);
-const rawData = params.get('d') || location.hash.slice(1);
-const fromLink = rawData ? dec(rawData) : null;
-const editing = params.has('edit');
+async function bootstrap(){
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const d = params.get('d') || location.hash.slice(1);
+  const editing = params.has('edit');
 
-if(fromLink && !editing) startVisitor(fromLink);
-else if(fromLink && editing){ fromLink.__fromLink=1; startEditor(fromLink); }
-else startEditor(JSON.parse(JSON.stringify(DEFAULT)));
+  // Carga por ID directo desde el repositorio en GitHub
+  if(id){
+    try {
+      const res = await fetch(`cards/${id}.json`);
+      if(res.ok){
+        const cardData = await res.json();
+        if(!editing) return startVisitor(cardData);
+        cardData.__fromLink = 1;
+        return startEditor(cardData);
+      }
+    } catch(e){}
+  }
+
+  // Carga alternativa si viene con datos en el enlace
+  const fromLink = d ? dec(d) : null;
+  if(fromLink && !editing) startVisitor(fromLink);
+  else if(fromLink && editing){ fromLink.__fromLink=1; startEditor(fromLink); }
+  else startEditor(JSON.parse(JSON.stringify(DEFAULT)));
+}
+
+bootstrap();
 })();
