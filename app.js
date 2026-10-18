@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-// REEMPLAZA ESTA URL CON LA DE TU WORKER CUANDO LO TENGAS LISTO:
+// URL de tu Worker en Cloudflare (cuando lo tengas desplegado)
 const WORKER_URL = 'https://bubbletree-api.tunombre.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
@@ -96,6 +96,7 @@ const cardHTML = () => '<div class="card noanim" id="card"><div class="avatar"><
 
 let LAY=null, LAYSIG='';
 function applyTheme(el,t){
+  if(!el) return;
   const T=TH[t]||TH.atardecer, st=el.style;
   st.setProperty('--bg',T.bg); st.setProperty('--fg',T.fg);
   st.setProperty('--b1bg',T.b1[0]); st.setProperty('--b1fg',T.b1[1]);
@@ -104,7 +105,7 @@ function applyTheme(el,t){
 }
 
 function avatarURL(a){
-  const v=(a.v||'').trim(); if(!v) return '';
+  const v=(a?.v||'').trim(); if(!v) return '';
   if(a.m==='ig'){
     const m=v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u=m?m[1]:v.replace(/^@/,'').split(/[\/?#\s]/)[0];
@@ -114,11 +115,12 @@ function avatarURL(a){
 }
 
 function updateAvatar(S,cb,force){
-  const img=$('#av'); $('#avl').textContent=(S.n||'?').trim().charAt(0).toUpperCase()||'?';
+  const img=$('#av'); if(!img) return;
+  const avl=$('#avl'); if(avl) avl.textContent=(S.n||'?').trim().charAt(0).toUpperCase()||'?';
   const url=avatarURL(S.a);
   if(!url){ img.style.display='none'; img.removeAttribute('src'); cb?.('none'); return; }
   if(img.dataset.src===url) return;
-  if(S.a.m==='ig'&&force!==true){ cb?.('pending'); return; }
+  if(S.a?.m==='ig'&&force!==true){ cb?.('pending'); return; }
   img.dataset.src=url;
   img.onload=()=>{ img.style.display='block'; cb?.('ok'); };
   img.onerror=()=>{ img.style.display='none'; cb?.('err'); };
@@ -128,8 +130,8 @@ function updateAvatar(S,cb,force){
 }
 
 function renderCloud(S,visitor,W,fresh){
-  const cloud=$('#cloud');
-  let list=S.g.map((g,i)=>({k:g[0],u:norm(g[0],g[1]),i}));
+  const cloud=$('#cloud'); if(!cloud) return;
+  let list=(S.g||[]).map((g,i)=>({k:g[0],u:norm(g[0],g[1]),i}));
   if(visitor) list=list.filter(x=>x.u);
   if(!list.length){ cloud.style.display='none'; cloud.innerHTML=''; return; }
   cloud.style.display='block';
@@ -140,23 +142,25 @@ function renderCloud(S,visitor,W,fresh){
   }
   cloud.style.width=W+'px'; cloud.style.height=LAY.H+'px';
   cloud.innerHTML=list.map((x,j)=>{
-    const p=LAY.items[j], m=LAY.meta[j], net=NET[x.k];
+    const p=LAY.items[j]||{x:0,y:0,s:60}, m=LAY.meta[j]||{d:0,t:3,f:0}, net=NET[x.k]||NET.link;
     const tag=x.u?'a':'span', href=x.u?` href="${esc(x.u)}" target="_blank" rel="noopener"`:'';
     return `<${tag}${href} class="gb${x.u?'':' ghost'}" aria-label="${esc(net.n)}" style="left:${Math.round(p.x)}px;top:${Math.round(p.y)}px;width:${p.s}px;height:${p.s}px;--d:${80+j*90+m.d%120}ms"><span class="bi" style="background:${net.c};--t:${m.t}s;--f:${m.f}s;--glow:${GLOW[x.k]||'#fff'}">${iconHTML(x.k)}</span></${tag}>`;
   }).join('');
 }
 
 function renderBtns(S,visitor){
-  const list=S.b.map(b=>({t:b[0],u:norm('',b[1])})).filter(b=>b.t.trim()&&(!visitor||b.u));
-  $('#cb').innerHTML=list.map((b,i)=>{
+  const el=$('#cb'); if(!el) return;
+  const list=(S.b||[]).map(b=>({t:b[0],u:norm('',b[1])})).filter(b=>b.t.trim()&&(!visitor||b.u));
+  el.innerHTML=list.map((b,i)=>{
     const cls=`btn${i===0?' primary':''}${b.u?'':' ghost'}`;
     return b.u?`<a class="${cls}" href="${esc(b.u)}" target="_blank" rel="noopener">${esc(b.t)}</a>`:`<span class="${cls}">${esc(b.t)}</span>`;
   }).join('');
 }
 
 function updateCard(S,o={}){
-  $('#cn').textContent=S.n; $('#cd').textContent=S.d;
-  $('#cd').style.display=S.d.trim()?'':'none';
+  const cn=$('#cn'), cd=$('#cd');
+  if(cn) cn.textContent=S.n;
+  if(cd){ cd.textContent=S.d; cd.style.display=S.d.trim()?'':'none'; }
   applyTheme(o.themeEl,S.t);
   updateAvatar(S,o.onAvatar,o.visitor||o.force);
   renderCloud(S,o.visitor,o.W,o.fresh);
@@ -166,22 +170,31 @@ function updateCard(S,o={}){
 function startVisitor(S){
   document.body.classList.add('visitor');
   document.title=S.n||'BubbleTree';
-  $('#app').innerHTML=cardHTML();
-  const c=$('#card'); c.classList.remove('noanim');
-  c.insertAdjacentHTML('beforeend',`<a class="credit" href="${esc(location.pathname)}">Crea la tuya con BubbleTree</a>`);
+  const app=$('#app'); if(!app) return;
+  app.innerHTML=cardHTML();
+  const c=$('#card');
+  if(c){
+    c.classList.remove('noanim');
+    c.insertAdjacentHTML('beforeend',`<a class="credit" href="${esc(location.pathname)}">Crea la tuya con BubbleTree</a>`);
+  }
   const root=document.documentElement;
   applyTheme(root,S.t);
   updateCard(S,{visitor:true,W:Math.min(340,Math.max(240,innerWidth-48)),themeEl:root});
 }
 
 function startEditor(S){
-  let photoMode=S.a.m==='url'?'url':'ig', cardId=localStorage.getItem('globos-cur')||null;
-  try{ const raw=localStorage.getItem('globos-draft'); if(raw&&!S.__fromLink){ const d=dec(raw); if(d) S=d; } }catch{}
-  delete S.__fromLink; photoMode=S.a.m==='url'?'url':'ig';
+  let photoMode=S.a?.m==='url'?'url':'ig', cardId=null;
+  try{ cardId=localStorage.getItem('globos-cur'); }catch{}
+  try{
+    const raw=localStorage.getItem('globos-draft');
+    if(raw&&!S.__fromLink){ const d=dec(raw); if(d) S=d; }
+  }catch{}
+  delete S.__fromLink;
 
   const catHTML=Object.keys(NET).map(k=>`<button type="button" data-add="${k}" aria-label="Añadir ${esc(NET[k].n)}" title="${esc(NET[k].n)}" style="background:${NET[k].c}">${iconHTML(k)}</button>`).join('');
 
-  $('#app').innerHTML=
+  const app=$('#app'); if(!app) return;
+  app.innerHTML=
   `<div class="top">
     <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>BubbleTree</div>
     <div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>
@@ -213,7 +226,7 @@ function startEditor(S){
     <div class="sec"><div class="sh"><b>3</b>Tema</div><div class="themes" id="themes"></div></div>
     <div class="sec"><div class="sh"><b>4</b>Burbujas de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
     <div class="sec"><div class="sh"><b>5</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
-    <div class="note"><span>Toca "Guardar en Git" para almacenar de por vida tu tarjeta. Tu enlace final quedará corto y limpio con tu nombre único.</span></div>
+    <div class="note"><span>Toca "Guardar en Git" para almacenar de por vida tu tarjeta. Tu enlace final quedará corto y limpio.</span></div>
    </div>
    <div class="stage">
      <div class="bar">
@@ -228,8 +241,8 @@ function startEditor(S){
 
   const phone=$('#phone'), W=276, CK='globos-cards';
   const getCards = () => { try{ return JSON.parse(localStorage.getItem(CK))||[]; }catch{ return []; } };
-  const putCards = a => localStorage.setItem(CK,JSON.stringify(a.slice(0,50)));
-  const setCur = () => cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur');
+  const putCards = a => { try{ localStorage.setItem(CK,JSON.stringify(a.slice(0,50))); }catch{} };
+  const setCur = () => { try{ cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur'); }catch{} };
 
   function getBaseUrl(){
     return (location.protocol==='file:'||location.origin==='null') 
@@ -245,12 +258,13 @@ function startEditor(S){
 
   function refreshLink(){
     const l = getActiveLink();
-    $('#lk').innerHTML=`<span style="color:#D4FF4F">${esc(l.replace(/^https?:\/\//,''))}</span>`;
-    $('#sz').textContent='directo';
+    const lk=$('#lk'), sz=$('#sz');
+    if(lk) lk.innerHTML=`<span style="color:#D4FF4F">${esc(l.replace(/^https?:\/\//,''))}</span>`;
+    if(sz) sz.textContent=S.id?'directo':'corto';
   }
 
   function refreshMine(){
-    const a=getCards(), sel=$('#mine');
+    const a=getCards(), sel=$('#mine'); if(!sel) return;
     sel.innerHTML=`<option value="">Mis tarjetas (${a.length})</option>`+a.map(c=>`<option value="${esc(c.id)}"${c.id===cardId?' selected':''}>${esc(c.n)}</option>`).join('');
     if(!cardId) sel.value='';
   }
@@ -262,27 +276,31 @@ function startEditor(S){
     putCards(a); setCur(); refreshMine();
   }
 
-  const missingCount = () => ({ g:S.g.filter(x=>!norm(x[0],x[1])).length, b:S.b.filter(x=>x[0].trim()&&!norm('',x[1])).length });
+  const missingCount = () => ({ g:(S.g||[]).filter(x=>!norm(x[0],x[1])).length, b:(S.b||[]).filter(x=>x[0].trim()&&!norm('',x[1])).length });
 
   function refreshWarn(){
-    const m=missingCount(), el=$('#warn'), p=[];
+    const m=missingCount(), el=$('#warn'); if(!el) return;
+    const p=[];
     if(m.g) p.push(`${m.g} burbuja${m.g===1?'':'s'}`);
     if(m.b) p.push(`${m.b} botón${m.b===1?'':'es'}`);
     el.hidden=!p.length;
-    if(p.length) el.textContent=`Sin enlace: ${p.join(' y ')} (se ven apagados aquí). Tus visitantes no los verán hasta que les pongas un enlace.`;
+    if(p.length) el.textContent=`Sin enlace: ${p.join(' y ')} (apagados en la vista previa).`;
   }
 
   const copyText = (t,msg) => navigator.clipboard?.writeText(t).then(()=>toast(msg),()=>prompt('Copia tu enlace:',t)) || prompt('Copia tu enlace:',t);
 
   function loadState(d,id){
-    S=d; cardId=id||S.id||null; photoMode=S.a.m==='url'?'url':'ig'; setCur();
-    $('#uid').value=S.id\vert{}\vert{}''; $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
-    renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); $('#av').dataset.src=''; refreshMine(); save();
-    if(S.a.v) updateAvatar(S,setStatus,true);
+    S=d; cardId=id||S.id||null; photoMode=S.a?.m==='url'?'url':'ig'; setCur();
+    $('#uid').value=S.id\vert{}\vert{}''; $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a?.v||'';
+    renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); 
+    const av=$('#av'); if(av) av.dataset.src='';
+    refreshMine(); save();
+    if(S.a?.v) updateAvatar(S,setStatus,true);
   }
 
   function setStatus(s){
-    const el=$('#avs'); el.className='status';
+    const el=$('#avs'); if(!el) return;
+    el.className='status';
     const msgs={
       none:photoMode==='ig'?'Escribe tu usuario de Instagram y pulsa Buscar.':'Pega la URL directa de una imagen.',
       pending:'Pulsa Buscar (o Enter) para cargar la foto.',
@@ -294,33 +312,37 @@ function startEditor(S){
   }
 
   function save(o={}){
-    phone.firstElementChild.classList.add('noanim');
+    if(phone?.firstElementChild) phone.firstElementChild.classList.add('noanim');
     updateCard(S,{W,themeEl:phone,fresh:o.fresh,onAvatar:setStatus});
-    if(o.fresh) phone.firstElementChild.classList.remove('noanim');
+    if(o.fresh && phone?.firstElementChild) phone.firstElementChild.classList.remove('noanim');
     refreshLink(); refreshWarn();
-    $('#cnt').textContent=`${S.d.length} / 160`;
+    const cnt=$('#cnt'); if(cnt) cnt.textContent=`${S.d.length} / 160`;
     try{ localStorage.setItem('globos-draft',enc(S)); }catch{}
   }
 
   function renderSeg(){
     document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===photoMode));
-    $('#av-in').placeholder=photoMode==='ig'?'tu.usuario':'https://…/foto.jpg';
-    $('#av-go').style.display=photoMode==='ig'?'':'none';
+    const ain=$('#av-in'), ago=$('#av-go');
+    if(ain) ain.placeholder=photoMode==='ig'?'tu.usuario':'https://…/foto.jpg';
+    if(ago) ago.style.display=photoMode==='ig'?'':'none';
   }
 
   function renderThemes(){
-    $('#themes').innerHTML=Object.keys(TH).map(k=>{
+    const th=$('#themes'); if(!th) return;
+    th.innerHTML=Object.keys(TH).map(k=>{
       const T=TH[k], sw=T.neon?'background:#0A0A14;border:2px solid #D4FF4F;box-shadow:0 0 12px #D4FF4F88':'background:'+T.bg;
       return `<button type="button" data-t="${k}" class="${S.t===k?'on':''}"><i style="${sw}"></i>${T.n}</button>`;
     }).join('');
   }
 
   function renderGlobos(){
-    $('#gl').innerHTML=S.g.map((g,i)=>`<div class="item"><span class="ic" style="background:${NET[g[0]].c}">${iconHTML(g[0])}</span><input class="in" data-gi="${i}" aria-label="Enlace de ${esc(NET[g[0]].n)}" placeholder="${g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace'}" value="${esc(g[1])}"><button class="x" type="button" data-gx="${i}" aria-label="Quitar ${esc(NET[g[0]].n)}">✕</button></div>`).join('')||'<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
+    const gl=$('#gl'); if(!gl) return;
+    gl.innerHTML=(S.g||[]).map((g,i)=>`<div class="item"><span class="ic" style="background:${NET[g[0]].c}">${iconHTML(g[0])}</span><input class="in" data-gi="${i}" aria-label="Enlace de ${esc(NET[g[0]].n)}" placeholder="${g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace'}" value="${esc(g[1])}"><button class="x" type="button" data-gx="${i}" aria-label="Quitar ${esc(NET[g[0]].n)}">✕</button></div>`).join('')||'<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
   }
 
   function renderBtnsList(){
-    $('#bl').innerHTML=S.b.map((b,i)=>`<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="${i}" aria-label="Texto del botón ${i+1}" maxlength="60" value="${esc(b[0])}"><input class="in" data-bu="${i}" aria-label="Enlace del botón ${i+1}" placeholder="https://…" value="${esc(b[1])}"><button class="x" type="button" data-bx="${i}" aria-label="Quitar botón ${i+1}">✕</button></div>`).join('');
+    const bl=$('#bl'); if(!bl) return;
+    bl.innerHTML=(S.b||[]).map((b,i)=>`<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="${i}" aria-label="Texto del botón ${i+1}" maxlength="60" value="${esc(b[0])}"><input class="in" data-bu="${i}" aria-label="Enlace del botón ${i+1}" placeholder="https://…" value="${esc(b[1])}"><button class="x" type="button" data-bx="${i}" aria-label="Quitar botón ${i+1}">✕</button></div>`).join('');
   }
 
   $('#uid').oninput = e => {
@@ -331,9 +353,9 @@ function startEditor(S){
     save();
   };
 
-  $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
+  $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a?.v||'';
   renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine(); save();
-  if(S.a.v) updateAvatar(S,setStatus,true);
+  if(S.a?.v) updateAvatar(S,setStatus,true);
 
   $('#n').oninput = e => { S.n=e.target.value; save(); };
   $('#d').oninput = e => { S.d=e.target.value; save(); };
@@ -352,7 +374,7 @@ function startEditor(S){
   $('#seg').onclick = e => {
     const b=e.target.closest('button'); if(!b) return;
     photoMode=b.dataset.m; S.a={m:photoMode,v:$('#av-in').value};
-    renderSeg(); $('#av').dataset.src=''; save(); if(photoMode!=='ig') lookup();
+    renderSeg(); const av=$('#av'); if(av) av.dataset.src=''; save(); if(photoMode!=='ig') lookup();
   };
 
   $('#themes').onclick = e => {
@@ -395,7 +417,7 @@ function startEditor(S){
   $('#savecard').onclick = async () => {
     const btn=$('#savecard');
     if(!S.id){
-      toast('Escribe primero un identificador en el paso 1');
+      toast('Escribe un nombre para tu enlace en el paso 1');
       $('#uid').focus();
       return;
     }
@@ -404,7 +426,7 @@ function startEditor(S){
 
     if(!WORKER_URL || WORKER_URL.includes('tunombre.workers.dev')){
       refreshLink();
-      toast('Tarjeta guardada localmente. Configura WORKER_URL para sincronizar con GitHub.');
+      toast('Guardado localmente. Recuerda configurar tu Cloudflare Worker para guardar en GitHub.');
       return;
     }
 
@@ -421,7 +443,7 @@ function startEditor(S){
 
       if(res.ok && data.ok){
         refreshLink();
-        toast('¡Tarjeta guardada de por vida en GitHub!');
+        toast('¡Tarjeta guardada en GitHub!');
       } else {
         toast('Error al guardar: ' + (data.error || 'Revisa tu Worker'));
       }
@@ -445,7 +467,7 @@ function startEditor(S){
   $('#delc').onclick = async () => {
     const id=$('#mine').value||cardId, a=getCards(), c=a.find(x=>x.id===id);
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
-    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista local y del repositorio.`)) return;
+    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista.`)) return;
     
     if(WORKER_URL && !WORKER_URL.includes('tunombre.workers.dev')){
       $('#delc').disabled = true;
@@ -472,12 +494,13 @@ function startEditor(S){
 
 let tt;
 function toast(m){
-  const t=$('#toast'); t.textContent=m; t.classList.add('show');
+  const t=$('#toast'); if(!t) return;
+  t.textContent=m; t.classList.add('show');
   clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3800);
 }
 
-/* ================= ARRANQUE ================= */
-async function bootstrap(){
+/* ================= ARRANQUE SEGURO ================= */
+async function startApp(){
   try {
     const params = new URLSearchParams(location.search);
     const id = params.get('id');
@@ -502,10 +525,13 @@ async function bootstrap(){
 
     startEditor(JSON.parse(JSON.stringify(DEFAULT)));
   } catch(err) {
-    // Si algo inesperado falla, fuerza la apertura limpia del editor
     startEditor(JSON.parse(JSON.stringify(DEFAULT)));
   }
 }
 
-bootstrap();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}
 })();
