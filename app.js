@@ -1,7 +1,12 @@
 (function(){
 'use strict';
 
-// URL de tu Worker en Cloudflare (cuando lo tengas desplegado)
+// Escudo anti-pantalla blanca
+window.onerror = function(msg, url, line) {
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h3 style="color:red;">Error al cargar</h3><p>' + msg + '</p><p>Línea: ' + line + '</p></div>';
+};
+
+// URL de tu Worker en Cloudflare
 const WORKER_URL = 'https://bubbletree-api.tunombre.workers.dev';
 
 const LINKSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
@@ -35,29 +40,36 @@ const DEFAULT = {
   b:[['Catálogo PDF',''],['Tienda online','']]
 };
 
-const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const $ = (s,r) => (r||document).querySelector(s);
-const enc = o => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const esc = function(s){ return String(s !== null && s !== undefined ? s : '').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
+const $ = function(s,r) { return (r||document).querySelector(s); };
+const enc = function(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+
+// Función para generar un ID limpio y automático basado en el título
+const slugify = function(s){ 
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0,30); 
+};
 
 function dec(s){
+  if(!s) return null;
   try{
     s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='=';
-    return sanitize(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)))));
-  }catch{ return null; }
+    return sanitize(JSON.parse(decodeURIComponent(escape(atob(s)))));
+  }catch(e){ return null; }
 }
 
 function sanitize(o){
   const r = JSON.parse(JSON.stringify(DEFAULT));
   if(!o||typeof o!=='object') return r;
-  if(typeof o.id==='string') r.id=o.id.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
   if(typeof o.n==='string') r.n=o.n.slice(0,60);
+  if(typeof o.id==='string' && o.id) r.id=o.id.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
+  if(!r.id && r.n) r.id = slugify(r.n); // Auto-crear ID si no existe
   if(typeof o.d==='string') r.d=o.d.slice(0,160);
   if(o.a&&typeof o.a.v==='string'){
     if(o.a.m==='ig'||o.a.m==='url') r.a={m:o.a.m,v:o.a.v.slice(0,400)};
   }
   if(TH[o.t]) r.t=o.t;
-  if(Array.isArray(o.g)) r.g=o.g.filter(x=>Array.isArray(x)&&NET[x[0]]).slice(0,12).map(x=>[x[0],String(x[1]||'').slice(0,400)]);
-  if(Array.isArray(o.b)) r.b=o.b.filter(x=>Array.isArray(x)).slice(0,8).map(x=>[String(x[0]||'').slice(0,60),String(x[1]||'').slice(0,400)]);
+  if(Array.isArray(o.g)) r.g=o.g.filter(function(x){ return Array.isArray(x)&&NET[x[0]]; }).slice(0,12).map(function(x){ return [x[0],String(x[1]||'').slice(0,400)]; });
+  if(Array.isArray(o.b)) r.b=o.b.filter(function(x){ return Array.isArray(x); }).slice(0,8).map(function(x){ return [String(x[0]||'').slice(0,60),String(x[1]||'').slice(0,400)]; });
   return r;
 }
 
@@ -65,34 +77,34 @@ function norm(k,u){
   u=(u||'').trim(); if(!u) return '';
   if(k==='whatsapp'&&/^[+\d\s()-]{7,}$/.test(u)) return 'https://wa.me/'+u.replace(/\D/g,'');
   if(/^(https?:\/\/|mailto:|tel:)/i.test(u)) return u;
-  if(u[0]==='@'&&NET[k]?.h) return NET[k].h+u.slice(1);
+  if(u[0]==='@' && NET[k] && NET[k].h) return NET[k].h+u.slice(1);
   return 'https://'+u.replace(/^\/+/,'');
 }
 
-const iconHTML = k => k==='link'?LINKSVG:`<img src="https://cdn.simpleicons.org/${k}/white" alt="" data-l="${esc(NET[k].n[0])}" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">`;
-const shuffle = a => a.sort(()=>Math.random()-.5);
+const iconHTML = function(k){ return k==='link'?LINKSVG:'<img src="https://cdn.simpleicons.org/'+k+'/white" alt="" data-l="'+esc(NET[k].n[0])+'" onerror="this.replaceWith(document.createTextNode(this.dataset.l))">'; };
+const shuffle = function(a){ return a.sort(function(){ return Math.random()-.5; }); };
 
 function layout(n,W){
   const H=Math.max(170,Math.min(330,100+n*34)), base=[88,80,74,68,62,56];
-  const sizes=shuffle(Array.from({length:n},(_,i)=>base[i%base.length]));
+  const sizes=shuffle(Array.from({length:n},function(_,i){ return base[i%base.length]; }));
   for(let att=0;att<8;att++){
-    const k=(1-att*.07)*(W<300?.9:1), ss=sizes.map(s=>Math.round(s*k));
-    const order=ss.map((s,i)=>i).sort((a,b)=>ss[b]-ss[a]), placed=[]; let ok=true;
-    for(const i of order){
-      const s=ss[i]; let p=null;
+    const k=(1-att*.07)*(W<300?.9:1), ss=sizes.map(function(s){ return Math.round(s*k); });
+    const order=ss.map(function(s,i){ return i; }).sort(function(a,b){ return ss[b]-ss[a]; }), placed=[]; let ok=true;
+    for(let oi=0; oi<order.length; oi++){
+      const i=order[oi], s=ss[i]; let p=null;
       for(let t=0;t<250&&!p;t++){
         const x=Math.random()*(W-s), y=Math.random()*(H-s), cx=x+s/2, cy=y+s/2;
-        if(placed.every(q=>Math.hypot(cx-q.cx,cy-q.cy)>=(s+q.s)/2+6)) p={x,y,cx,cy,s,i};
+        if(placed.every(function(q){ return Math.hypot(cx-q.cx,cy-q.cy)>=(s+q.s)/2+6; })) p={x:x,y:y,cx:cx,cy:cy,s:s,i:i};
       }
       if(!p){ok=false;break;} placed.push(p);
     }
-    if(ok){ const out=[]; placed.forEach(p=>out[p.i]=p); return {H,items:out}; }
+    if(ok){ const out=[]; placed.forEach(function(p){ out[p.i]=p; }); return {H:H,items:out}; }
   }
   const cols=Math.max(1,Math.ceil(Math.sqrt(n*W/H))), cell=W/cols, s=Math.floor(cell*.82);
-  return {H:Math.max(H,Math.ceil(n/cols)*cell),items:Array.from({length:n},(_,i)=>({x:(i%cols)*cell+(cell-s)/2,y:Math.floor(i/cols)*cell+(cell-s)/2,s}))};
+  return {H:Math.max(H,Math.ceil(n/cols)*cell),items:Array.from({length:n},function(_,i){ return {x:(i%cols)*cell+(cell-s)/2,y:Math.floor(i/cols)*cell+(cell-s)/2,s:s}; })};
 }
 
-const cardHTML = () => '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt=""><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>';
+const cardHTML = function(){ return '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt=""><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>'; };
 
 let LAY=null, LAYSIG='';
 function applyTheme(el,t){
@@ -101,63 +113,68 @@ function applyTheme(el,t){
   st.setProperty('--bg',T.bg); st.setProperty('--fg',T.fg);
   st.setProperty('--b1bg',T.b1[0]); st.setProperty('--b1fg',T.b1[1]);
   st.setProperty('--b2bg',T.b2[0]); st.setProperty('--b2fg',T.b2[1]); st.setProperty('--b2bd',T.b2[2]);
-  $('#card')?.classList.toggle('neon',!!T.neon);
+  const c = $('#card');
+  if(c) {
+    if(T.neon) c.classList.add('neon');
+    else c.classList.remove('neon');
+  }
 }
 
 function avatarURL(a){
-  const v=(a?.v||'').trim(); if(!v) return '';
+  const v=(a && a.v ? a.v : '').trim(); if(!v) return '';
   if(a.m==='ig'){
     const m=v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u=m?m[1]:v.replace(/^@/,'').split(/[\/?#\s]/)[0];
-    return u?`https://unavatar.io/instagram/${encodeURIComponent(u)}?fallback=false`:'';
+    return u?'https://unavatar.io/instagram/'+encodeURIComponent(u)+'?fallback=false':'';
   }
   return /^https?:\/\//i.test(v)?v:'https://'+v;
 }
 
 function updateAvatar(S,cb,force){
-  const img=$('#av'); if(!img) return;
+  const img=$('#av'); if(!img) { if(cb) cb('none'); return; }
   const avl=$('#avl'); if(avl) avl.textContent=(S.n||'?').trim().charAt(0).toUpperCase()||'?';
   const url=avatarURL(S.a);
-  if(!url){ img.style.display='none'; img.removeAttribute('src'); cb?.('none'); return; }
+  if(!url){ img.style.display='none'; img.removeAttribute('src'); if(cb) cb('none'); return; }
   if(img.dataset.src===url) return;
-  if(S.a?.m==='ig'&&force!==true){ cb?.('pending'); return; }
+  if(S.a && S.a.m==='ig' && force!==true){ if(cb) cb('pending'); return; }
   img.dataset.src=url;
-  img.onload=()=>{ img.style.display='block'; cb?.('ok'); };
-  img.onerror=()=>{ img.style.display='none'; cb?.('err'); };
-  cb?.('load');
+  img.onload=function(){ img.style.display='block'; if(cb) cb('ok'); };
+  img.onerror=function(){ img.style.display='none'; if(cb) cb('err'); };
+  if(cb) cb('load');
   img.referrerPolicy='no-referrer';
   img.src=url;
 }
 
 function renderCloud(S,visitor,W,fresh){
   const cloud=$('#cloud'); if(!cloud) return;
-  let list=(S.g||[]).map((g,i)=>({k:g[0],u:norm(g[0],g[1]),i}));
-  if(visitor) list=list.filter(x=>x.u);
+  let list=(S.g||[]).map(function(g,i){ return {k:g[0],u:norm(g[0],g[1]),i:i}; });
+  if(visitor) list=list.filter(function(x){ return x.u; });
   if(!list.length){ cloud.style.display='none'; cloud.innerHTML=''; return; }
   cloud.style.display='block';
-  const sig=list.map(x=>x.k).join(',')+'|'+W;
+  const sig=list.map(function(x){ return x.k; }).join(',')+'|'+W;
   if(fresh||!LAY||sig!==LAYSIG){
     LAY=layout(list.length,W); LAYSIG=sig;
-    LAY.meta=list.map(()=>({d:Math.round(Math.random()*350),t:(3+Math.random()*1.8).toFixed(2),f:(-Math.random()*3).toFixed(2)}));
+    LAY.meta=list.map(function(){ return {d:Math.round(Math.random()*350),t:(3+Math.random()*1.8).toFixed(2),f:(-Math.random()*3).toFixed(2)}; });
   }
   cloud.style.width=W+'px'; cloud.style.height=LAY.H+'px';
-  cloud.innerHTML=list.map((x,j)=>{
+  cloud.innerHTML=list.map(function(x,j){
     const p=LAY.items[j]||{x:0,y:0,s:60}, m=LAY.meta[j]||{d:0,t:3,f:0}, net=NET[x.k]||NET.link;
-    const tag=x.u?'a':'span', href=x.u?` href="${esc(x.u)}" target="_blank" rel="noopener"`:'';
-    return `<${tag}${href} class="gb${x.u?'':' ghost'}" aria-label="${esc(net.n)}" style="left:${Math.round(p.x)}px;top:${Math.round(p.y)}px;width:${p.s}px;height:${p.s}px;--d:${80+j*90+m.d%120}ms"><span class="bi" style="background:${net.c};--t:${m.t}s;--f:${m.f}s;--glow:${GLOW[x.k]||'#fff'}">${iconHTML(x.k)}</span></${tag}>`;
+    const tag=x.u?'a':'span', href=x.u?' href="'+esc(x.u)+'" target="_blank" rel="noopener"':'';
+    return '<'+tag+href+' class="gb'+(x.u?'':' ghost')+'" aria-label="'+esc(net.n)+'" style="left:'+Math.round(p.x)+'px;top:'+Math.round(p.y)+'px;width:'+p.s+'px;height:'+p.s+'px;--d:'+(80+j*90+m.d%120)+'ms"><span class="bi" style="background:'+net.c+';--t:'+m.t+'s;--f:'+m.f+'s;--glow:'+(GLOW[x.k]||'#fff')+'">'+iconHTML(x.k)+'</span></'+tag+'>';
   }).join('');
 }
 
 function renderBtns(S,visitor){
   const el=$('#cb'); if(!el) return;
-  const list=(S.b||[]).map(b=>({t:b[0],u:norm('',b[1])})).filter(b=>b.t.trim()&&(!visitor||b.u));
-  el.innerHTML=list.map((b,i)=>{
-    const cls=`btn${i===0?' primary':''}${b.u?'':' ghost'}`;
-    return b.u?`<a class="${cls}" href="${esc(b.u)}" target="_blank" rel="noopener">${esc(b.t)}</a>`:`<span class="${cls}">${esc(b.t)}</span>`;
+  const list=(S.b||[]).map(function(b){ return {t:b[0],u:norm('',b[1])}; }).filter(function(b){ return b.t.trim()&&(!visitor||b.u); });
+  el.innerHTML=list.map(function(b,i){
+    const cls='btn'+(i===0?' primary':'')+(b.u?'':' ghost');
+    return b.u?'<a class="'+cls+'" href="'+esc(b.u)+'" target="_blank" rel="noopener">'+esc(b.t)+'</a>':'<span class="'+cls+'">'+esc(b.t)+'</span>';
   }).join('');
 }
 
-function updateCard(S,o={}){
+function updateCard(S,o){
+  o = o || {};
   const cn=$('#cn'), cd=$('#cd');
   if(cn) cn.textContent=S.n;
   if(cd){ cd.textContent=S.d; cd.style.display=S.d.trim()?'':'none'; }
@@ -170,12 +187,17 @@ function updateCard(S,o={}){
 function startVisitor(S){
   document.body.classList.add('visitor');
   document.title=S.n||'BubbleTree';
-  const app=$('#app'); if(!app) return;
+  let app=$('#app'); 
+  if(!app){
+    app=document.createElement('div');
+    app.id='app';
+    document.body.appendChild(app);
+  }
   app.innerHTML=cardHTML();
   const c=$('#card');
   if(c){
     c.classList.remove('noanim');
-    c.insertAdjacentHTML('beforeend',`<a class="credit" href="${esc(location.pathname)}">Crea la tuya con BubbleTree</a>`);
+    c.insertAdjacentHTML('beforeend','<a class="credit" href="'+esc(location.pathname)+'">Crea la tuya con BubbleTree</a>');
   }
   const root=document.documentElement;
   applyTheme(root,S.t);
@@ -183,66 +205,64 @@ function startVisitor(S){
 }
 
 function startEditor(S){
-  let photoMode=S.a?.m==='url'?'url':'ig', cardId=null;
-  try{ cardId=localStorage.getItem('globos-cur'); }catch{}
-  try{
-    const raw=localStorage.getItem('globos-draft');
-    if(raw&&!S.__fromLink){ const d=dec(raw); if(d) S=d; }
-  }catch{}
-  delete S.__fromLink;
+  let photoMode = (S.a && S.a.m === 'url') ? 'url' : 'ig';
+  let cardId = null;
+  try{ cardId=localStorage.getItem('globos-cur'); }catch(e){}
 
-  const catHTML=Object.keys(NET).map(k=>`<button type="button" data-add="${k}" aria-label="Añadir ${esc(NET[k].n)}" title="${esc(NET[k].n)}" style="background:${NET[k].c}">${iconHTML(k)}</button>`).join('');
+  const catHTML=Object.keys(NET).map(function(k){ return '<button type="button" data-add="'+k+'" aria-label="Añadir '+esc(NET[k].n)+'" title="'+esc(NET[k].n)+'" style="background:'+NET[k].c+'">'+iconHTML(k)+'</button>'; }).join('');
 
-  const app=$('#app'); if(!app) return;
+  let app=$('#app'); 
+  if(!app){
+    app=document.createElement('div');
+    app.id='app';
+    document.body.appendChild(app);
+  }
+  
   app.innerHTML=
-  `<div class="top">
-    <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>BubbleTree</div>
-    <div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>
-    <select class="tb sel" id="mine" aria-label="Mis tarjetas"></select>
-    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5;color:#fff;font-weight:700">💾 Guardar en Git</button>
-    <button class="copy" id="copy" type="button">Copiar enlace</button>
-    <button class="tb" id="newc" type="button">Nueva</button>
-    <button class="tb" id="delc" type="button">Borrar</button>
-    <button class="tb" id="vis" type="button">Vista previa</button>
-  </div>
-  <div class="split">
-   <div class="panel">
-    <div class="sec"><div class="sh"><b>1</b>Identificador del enlace</div>
-      <div><label for="uid">Nombre único para tu URL (ejemplo: miperfil)</label>
-      <input class="in" id="uid" maxlength="30" placeholder="miperfil" value="${esc(S.id||'')}"></div>
-    </div>
-    <div class="sec"><div class="sh"><b>2</b>Perfil</div>
-      <div><label for="n">Nombre o título</label><input class="in" id="n" maxlength="60"></div>
-      <div><label for="d">Descripción corta <span class="cnt" id="cnt"></span></label><textarea class="in" id="d" maxlength="160"></textarea></div>
-      <div><label>Foto de perfil</label>
-        <div class="row" style="flex-wrap:wrap">
-          <div class="seg" id="seg"><button type="button" data-m="ig">Instagram</button><button type="button" data-m="url">URL</button></div>
-          <input class="in" id="av-in" aria-label="Usuario o URL" style="flex:1;min-width:140px;width:auto">
-          <button class="tb" id="av-go" type="button" style="color:var(--ink);border-color:var(--ink)">Buscar</button>
-        </div>
-        <div class="status" id="avs"></div>
-      </div>
-    </div>
-    <div class="sec"><div class="sh"><b>3</b>Tema</div><div class="themes" id="themes"></div></div>
-    <div class="sec"><div class="sh"><b>4</b>Burbujas de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
-    <div class="sec"><div class="sh"><b>5</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
-    <div class="note"><span>Toca "Guardar en Git" para almacenar de por vida tu tarjeta. Tu enlace final quedará corto y limpio.</span></div>
-   </div>
-   <div class="stage">
-     <div class="bar">
-       <span class="live"><i></i>Vista previa en vivo</span>
-       <button class="play" id="play" type="button">▶ Probar efecto de burbujas</button>
-     </div>
-     <div class="warn" id="warn" hidden></div>
-     <div class="phone" id="phone">${cardHTML()}</div>
-     <div style="font-size:13px;color:#4A465C;text-align:center">Cada cambio se refleja aquí en tiempo real.</div>
-   </div>
-  </div>`;
+  '<div class="top">'+
+    '<div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>BubbleTree</div>'+
+    '<div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>'+
+    '<select class="tb sel" id="mine" aria-label="Mis tarjetas"></select>'+
+    '<button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5;color:#fff;font-weight:700">💾 Guardar</button>'+
+    '<button class="copy" id="copy" type="button">Copiar enlace</button>'+
+    '<button class="tb" id="newc" type="button">Nueva</button>'+
+    '<button class="tb" id="delc" type="button">Borrar</button>'+
+    '<button class="tb" id="vis" type="button">Vista previa</button>'+
+  '</div>'+
+  '<div class="split">'+
+   '<div class="panel">'+
+    '<div class="sec"><div class="sh"><b>1</b>Perfil</div>'+
+      '<div><label for="n">Nombre o título</label><input class="in" id="n" maxlength="60"></div>'+
+      '<div><label for="d">Descripción corta <span class="cnt" id="cnt"></span></label><textarea class="in" id="d" maxlength="160"></textarea></div>'+
+      '<div><label>Foto de perfil</label>'+
+        '<div class="row" style="flex-wrap:wrap">'+
+          '<div class="seg" id="seg"><button type="button" data-m="ig">Instagram</button><button type="button" data-m="url">URL</button></div>'+
+          '<input class="in" id="av-in" aria-label="Usuario o URL" style="flex:1;min-width:140px;width:auto">'+
+          '<button class="tb" id="av-go" type="button" style="color:var(--ink);border-color:var(--ink)">Buscar</button>'+
+        '</div>'+
+        '<div class="status" id="avs"></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="sec"><div class="sh"><b>2</b>Tema</div><div class="themes" id="themes"></div></div>'+
+    '<div class="sec"><div class="sh"><b>3</b>Burbujas de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">'+catHTML+'</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>'+
+    '<div class="sec"><div class="sh"><b>4</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>'+
+    '<div class="note"><span>Toca "Guardar" para almacenar tu tarjeta. Tu enlace final se generará automáticamente a partir del nombre de tu perfil.</span></div>'+
+   '</div>'+
+   '<div class="stage">'+
+     '<div class="bar">'+
+       '<span class="live"><i></i>Vista previa en vivo</span>'+
+       '<button class="play" id="play" type="button">▶ Probar efecto de burbujas</button>'+
+     '</div>'+
+     '<div class="warn" id="warn" hidden></div>'+
+     '<div class="phone" id="phone">'+cardHTML()+'</div>'+
+     '<div style="font-size:13px;color:#4A465C;text-align:center">Cada cambio se refleja aquí en tiempo real.</div>'+
+   '</div>'+
+  '</div>';
 
   const phone=$('#phone'), W=276, CK='globos-cards';
-  const getCards = () => { try{ return JSON.parse(localStorage.getItem(CK))||[]; }catch{ return []; } };
-  const putCards = a => { try{ localStorage.setItem(CK,JSON.stringify(a.slice(0,50))); }catch{} };
-  const setCur = () => { try{ cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur'); }catch{} };
+  const getCards = function(){ try{ return JSON.parse(localStorage.getItem(CK))||[]; }catch(e){ return []; } };
+  const putCards = function(a){ try{ localStorage.setItem(CK,JSON.stringify(a.slice(0,50))); }catch(e){} };
+  const setCur = function(){ try{ cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur'); }catch(e){} };
 
   function getBaseUrl(){
     return (location.protocol==='file:'||location.origin==='null') 
@@ -252,50 +272,56 @@ function startEditor(S){
 
   function getActiveLink(){
     const targetId = S.id || cardId;
-    if(targetId) return `${getBaseUrl()}?id=${encodeURIComponent(targetId)}`;
-    return `${getBaseUrl()}?d=${enc(S)}`;
+    if(targetId) return getBaseUrl() + '?id=' + encodeURIComponent(targetId);
+    return getBaseUrl() + '?d=' + enc(S);
   }
 
   function refreshLink(){
     const l = getActiveLink();
     const lk=$('#lk'), sz=$('#sz');
-    if(lk) lk.innerHTML=`<span style="color:#D4FF4F">${esc(l.replace(/^https?:\/\//,''))}</span>`;
-    if(sz) sz.textContent=S.id?'directo':'corto';
+    if(lk) lk.innerHTML='<span style="color:#D4FF4F">'+esc(l.replace(/^https?:\/\//,''))+'</span>';
+    if(sz) sz.textContent=S.id?'directo':'largo';
   }
 
   function refreshMine(){
     const a=getCards(), sel=$('#mine'); if(!sel) return;
-    sel.innerHTML=`<option value="">Mis tarjetas (${a.length})</option>`+a.map(c=>`<option value="${esc(c.id)}"${c.id===cardId?' selected':''}>${esc(c.n)}</option>`).join('');
+    sel.innerHTML='<option value="">Mis tarjetas ('+a.length+')</option>'+a.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===cardId?' selected':'')+'>'+esc(c.n)+'</option>'; }).join('');
     if(!cardId) sel.value='';
   }
 
   function upsertCard(){
     const a=getCards(); if(!cardId) cardId=S.id || ('c'+Date.now().toString(36));
-    let c=a.find(x=>x.id===cardId); if(!c){ c={id:cardId}; a.unshift(c); }
+    let c=a.find(function(x){ return x.id===cardId; }); if(!c){ c={id:cardId}; a.unshift(c); }
     c.n=S.n||'Sin nombre'; c.e=enc(S);
     putCards(a); setCur(); refreshMine();
   }
 
-  const missingCount = () => ({ g:(S.g||[]).filter(x=>!norm(x[0],x[1])).length, b:(S.b||[]).filter(x=>x[0].trim()&&!norm('',x[1])).length });
+  const missingCount = function(){ return { g:(S.g||[]).filter(function(x){ return !norm(x[0],x[1]); }).length, b:(S.b||[]).filter(function(x){ return x[0].trim()&&!norm('',x[1]); }).length }; };
 
   function refreshWarn(){
     const m=missingCount(), el=$('#warn'); if(!el) return;
     const p=[];
-    if(m.g) p.push(`${m.g} burbuja${m.g===1?'':'s'}`);
-    if(m.b) p.push(`${m.b} botón${m.b===1?'':'es'}`);
+    if(m.g) p.push(m.g+' burbuja'+(m.g===1?'':'s'));
+    if(m.b) p.push(m.b+' botón'+(m.b===1?'':'es'));
     el.hidden=!p.length;
-    if(p.length) el.textContent=`Sin enlace: ${p.join(' y ')} (apagados en la vista previa).`;
+    if(p.length) el.textContent='Sin enlace: ' + p.join(' y ') + ' (apagados en la vista previa).';
   }
 
-  const copyText = (t,msg) => navigator.clipboard?.writeText(t).then(()=>toast(msg),()=>prompt('Copia tu enlace:',t)) || prompt('Copia tu enlace:',t);
+  const copyText = function(t,msg){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){ toast(msg); }).catch(function(){ prompt('Copia tu enlace:',t); });
+    } else {
+      prompt('Copia tu enlace:',t);
+    }
+  };
 
   function loadState(d,id){
-    S=d; cardId=id||S.id||null; photoMode=S.a?.m==='url'?'url':'ig'; setCur();
-    $('#uid').value=S.id\vert{}\vert{}''; $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a?.v||'';
+    S=d; cardId=id||S.id||null; photoMode=(S.a && S.a.m==='url')?'url':'ig'; setCur();
+    $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=(S.a && S.a.v ? S.a.v : '');
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); 
     const av=$('#av'); if(av) av.dataset.src='';
     refreshMine(); save();
-    if(S.a?.v) updateAvatar(S,setStatus,true);
+    if(S.a && S.a.v) updateAvatar(S,setStatus,true);
   }
 
   function setStatus(s){
@@ -311,17 +337,23 @@ function startEditor(S){
     if(s==='ok') el.classList.add('ok');
   }
 
-  function save(o={}){
-    if(phone?.firstElementChild) phone.firstElementChild.classList.add('noanim');
-    updateCard(S,{W,themeEl:phone,fresh:o.fresh,onAvatar:setStatus});
-    if(o.fresh && phone?.firstElementChild) phone.firstElementChild.classList.remove('noanim');
+  function save(o){
+    o = o || {};
+    if(phone && phone.firstElementChild) phone.firstElementChild.classList.add('noanim');
+    updateCard(S,{W:W,themeEl:phone,fresh:o.fresh,onAvatar:setStatus});
+    if(o.fresh && phone && phone.firstElementChild) phone.firstElementChild.classList.remove('noanim');
     refreshLink(); refreshWarn();
-    const cnt=$('#cnt'); if(cnt) cnt.textContent=`${S.d.length} / 160`;
-    try{ localStorage.setItem('globos-draft',enc(S)); }catch{}
+    const cnt=$('#cnt'); if(cnt) cnt.textContent=S.d.length + ' / 160';
+    try{ localStorage.setItem('globos-draft',enc(S)); }catch(e){}
   }
 
   function renderSeg(){
-    document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===photoMode));
+    const btns = document.querySelectorAll('#seg button');
+    for(let i=0; i<btns.length; i++) {
+       const b = btns[i];
+       if(b.dataset.m === photoMode) b.classList.add('on');
+       else b.classList.remove('on');
+    }
     const ain=$('#av-in'), ago=$('#av-go');
     if(ain) ain.placeholder=photoMode==='ig'?'tu.usuario':'https://…/foto.jpg';
     if(ago) ago.style.display=photoMode==='ig'?'':'none';
@@ -329,164 +361,166 @@ function startEditor(S){
 
   function renderThemes(){
     const th=$('#themes'); if(!th) return;
-    th.innerHTML=Object.keys(TH).map(k=>{
+    th.innerHTML=Object.keys(TH).map(function(k){
       const T=TH[k], sw=T.neon?'background:#0A0A14;border:2px solid #D4FF4F;box-shadow:0 0 12px #D4FF4F88':'background:'+T.bg;
-      return `<button type="button" data-t="${k}" class="${S.t===k?'on':''}"><i style="${sw}"></i>${T.n}</button>`;
+      return '<button type="button" data-t="'+k+'" class="'+(S.t===k?'on':'')+'"><i style="'+sw+'"></i>'+T.n+'</button>';
     }).join('');
   }
 
   function renderGlobos(){
     const gl=$('#gl'); if(!gl) return;
-    gl.innerHTML=(S.g||[]).map((g,i)=>`<div class="item"><span class="ic" style="background:${NET[g[0]].c}">${iconHTML(g[0])}</span><input class="in" data-gi="${i}" aria-label="Enlace de ${esc(NET[g[0]].n)}" placeholder="${g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace'}" value="${esc(g[1])}"><button class="x" type="button" data-gx="${i}" aria-label="Quitar ${esc(NET[g[0]].n)}">✕</button></div>`).join('')||'<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
+    gl.innerHTML=(S.g||[]).map(function(g,i){ return '<div class="item"><span class="ic" style="background:'+NET[g[0]].c+'">'+iconHTML(g[0])+'</span><input class="in" data-gi="'+i+'" aria-label="Enlace de '+esc(NET[g[0]].n)+'" placeholder="'+(g[0]==='whatsapp'?'Número con código de país, ej. 56912345678':['spotify','link','discord'].includes(g[0])?'Pega el enlace':'@usuario o enlace')+'" value="'+esc(g[1])+'"><button class="x" type="button" data-gx="'+i+'" aria-label="Quitar '+esc(NET[g[0]].n)+'">✕</button></div>'; }).join('')||'<div class="status">Aún no hay burbujas. Toca un logo arriba.</div>';
   }
 
   function renderBtnsList(){
     const bl=$('#bl'); if(!bl) return;
-    bl.innerHTML=(S.b||[]).map((b,i)=>`<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="${i}" aria-label="Texto del botón ${i+1}" maxlength="60" value="${esc(b[0])}"><input class="in" data-bu="${i}" aria-label="Enlace del botón ${i+1}" placeholder="https://…" value="${esc(b[1])}"><button class="x" type="button" data-bx="${i}" aria-label="Quitar botón ${i+1}">✕</button></div>`).join('');
+    bl.innerHTML=(S.b||[]).map(function(b,i){ return '<div class="item"><input class="in" style="width:190px;flex:none;font-weight:700" data-bt="'+i+'" aria-label="Texto del botón '+ (i+1) +'" maxlength="60" value="'+esc(b[0])+'"><input class="in" data-bu="'+i+'" aria-label="Enlace del botón '+ (i+1) +'" placeholder="https://…" value="'+esc(b[1])+'"><button class="x" type="button" data-bx="'+i+'" aria-label="Quitar botón '+ (i+1) +'">✕</button></div>'; }).join('');
   }
 
-  $('#uid').oninput = e => {
-    const clean = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,30);
-    e.target.value = clean;
-    S.id = clean;
-    cardId = clean || null;
-    save();
-  };
-
-  $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a?.v||'';
+  $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=(S.a && S.a.v ? S.a.v : '');
   renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); refreshMine(); save();
-  if(S.a?.v) updateAvatar(S,setStatus,true);
+  if(S.a && S.a.v) updateAvatar(S,setStatus,true);
 
-  $('#n').oninput = e => { S.n=e.target.value; save(); };
-  $('#d').oninput = e => { S.d=e.target.value; save(); };
+  // Al escribir el nombre, generamos automáticamente el ID
+  $('#n').oninput = function(e){ 
+    S.n=e.target.value; 
+    S.id=slugify(S.n);
+    cardId=S.id||null;
+    save(); 
+  };
+  
+  $('#d').oninput = function(e){ S.d=e.target.value; save(); };
 
-  const lookup = () => updateAvatar(S,setStatus,true);
+  const lookup = function(){ updateAvatar(S,setStatus,true); };
   let avT;
-  $('#av-in').oninput = e => {
+  $('#av-in').oninput = function(e){
     S.a={m:photoMode,v:e.target.value}; save(); clearTimeout(avT);
     if(photoMode==='ig'&&e.target.value.trim().length>=2) avT=setTimeout(lookup,1500);
     else lookup();
   };
-  $('#av-in').onkeydown = e => { if(e.key==='Enter'){ clearTimeout(avT); lookup(); } };
-  $('#av-in').onblur = () => { clearTimeout(avT); if(photoMode==='ig') lookup(); };
-  $('#av-go').onclick = () => { clearTimeout(avT); lookup(); };
+  $('#av-in').onkeydown = function(e){ if(e.key==='Enter'){ clearTimeout(avT); lookup(); } };
+  $('#av-in').onblur = function(){ clearTimeout(avT); if(photoMode==='ig') lookup(); };
+  $('#av-go').onclick = function(){ clearTimeout(avT); lookup(); };
 
-  $('#seg').onclick = e => {
+  $('#seg').onclick = function(e){
     const b=e.target.closest('button'); if(!b) return;
     photoMode=b.dataset.m; S.a={m:photoMode,v:$('#av-in').value};
     renderSeg(); const av=$('#av'); if(av) av.dataset.src=''; save(); if(photoMode!=='ig') lookup();
   };
 
-  $('#themes').onclick = e => {
+  $('#themes').onclick = function(e){
     const b=e.target.closest('button'); if(!b) return;
     S.t=b.dataset.t; renderThemes(); save();
   };
 
-  $('#cat').onclick = e => {
+  $('#cat').onclick = function(e){
     const b=e.target.closest('button'); if(!b) return;
     if(S.g.length>=12){ toast('Máximo 12 burbujas'); return; }
     S.g.push([b.dataset.add,'']); renderGlobos(); save();
-    const ins=document.querySelectorAll('#gl input'); ins[ins.length-1]?.focus();
+    const ins=document.querySelectorAll('#gl input'); 
+    if(ins.length) ins[ins.length-1].focus();
   };
 
-  $('#gl').oninput = e => { const i=e.target.dataset.gi; if(i!=null){ S.g[i][1]=e.target.value; save(); } };
-  $('#gl').onclick = e => { const b=e.target.closest('[data-gx]'); if(b){ S.g.splice(+b.dataset.gx,1); renderGlobos(); save(); } };
+  $('#gl').oninput = function(e){ const i=e.target.dataset.gi; if(i!=null){ S.g[i][1]=e.target.value; save(); } };
+  $('#gl').onclick = function(e){ const b=e.target.closest('[data-gx]'); if(b){ S.g.splice(+b.dataset.gx,1); renderGlobos(); save(); } };
 
-  $('#bl').oninput = e => {
+  $('#bl').oninput = function(e){
     const t=e.target.dataset;
     if(t.bt!=null) S.b[t.bt][0]=e.target.value;
     else if(t.bu!=null) S.b[t.bu][1]=e.target.value;
     else return;
     save();
   };
-  $('#bl').onclick = e => { const b=e.target.closest('[data-bx]'); if(b){ S.b.splice(+b.dataset.bx,1); renderBtnsList(); save(); } };
+  $('#bl').onclick = function(e){ const b=e.target.closest('[data-bx]'); if(b){ S.b.splice(+b.dataset.bx,1); renderBtnsList(); save(); } };
 
-  $('#addb').onclick = () => {
+  $('#addb').onclick = function(){
     if(S.b.length>=8){ toast('Máximo 8 botones'); return; }
     S.b.push(['Nuevo botón','']); renderBtnsList(); save();
     const ins=document.querySelectorAll('#bl input[data-bt]');
-    ins[ins.length-1]?.focus(); ins[ins.length-1]?.select();
+    if(ins.length){ ins[ins.length-1].focus(); ins[ins.length-1].select(); }
   };
 
-  $('#play').onclick = () => save({fresh:true});
-  $('#vis').onclick = () => {
-    const m=missingCount(); if(m.g||m.b) toast('Ojo: los elementos sin enlace no se mostrarán a los visitantes');
+  $('#play').onclick = function(){ save({fresh:true}); };
+  $('#vis').onclick = function(){
+    const m=missingCount(); if(m.g||m.b) toast('Ojo: los elementos sin enlace no se mostrarán');
     window.open(getActiveLink(),'_blank');
   };
 
-  $('#savecard').onclick = async () => {
+  $('#savecard').onclick = async function(){
     const btn=$('#savecard');
-    if(!S.id){
-      toast('Escribe un nombre para tu enlace en el paso 1');
-      $('#uid').focus();
+    if(!S.n || !S.n.trim()){
+      toast('Escribe un nombre o título en el paso 1');
+      const ui=$('#n'); if(ui) ui.focus();
       return;
     }
+
+    if(!S.id) S.id = slugify(S.n);
 
     upsertCard();
 
-    if(!WORKER_URL || WORKER_URL.includes('tunombre.workers.dev')){
+    if(!WORKER_URL || WORKER_URL.indexOf('tunombre.workers.dev') !== -1){
       refreshLink();
-      toast('Guardado localmente. Recuerda configurar tu Cloudflare Worker para guardar en GitHub.');
+      toast('Guardado localmente.');
       return;
     }
 
-    btn.disabled=true; btn.textContent='Guardando en Git…';
+    btn.disabled=true; btn.textContent='Guardando…';
 
     try {
-      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(S.id)}`, {
+      const res = await fetch(WORKER_URL + '?id=' + encodeURIComponent(S.id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(S)
       });
       const data = await res.json();
-      btn.disabled=false; btn.textContent='💾 Guardar en Git';
+      btn.disabled=false; btn.textContent='💾 Guardar';
 
       if(res.ok && data.ok){
         refreshLink();
-        toast('¡Tarjeta guardada en GitHub!');
+        toast('¡Tarjeta guardada!');
       } else {
         toast('Error al guardar: ' + (data.error || 'Revisa tu Worker'));
       }
     } catch(err) {
-      btn.disabled=false; btn.textContent='💾 Guardar en Git';
-      toast('No se pudo conectar con Cloudflare Worker');
+      btn.disabled=false; btn.textContent='💾 Guardar';
+      toast('No se pudo conectar con el servidor');
     }
   };
 
-  $('#copy').onclick = () => {
+  $('#copy').onclick = function(){
     copyText(getActiveLink(), '¡Enlace copiado al portapapeles!');
   };
 
-  $('#mine').onchange = e => {
-    const c=getCards().find(x=>x.id===e.target.value);
+  $('#mine').onchange = function(e){
+    const c=getCards().find(function(x){ return x.id===e.target.value; });
     if(!c){ refreshMine(); return; }
     const d=dec(c.e); if(!d){ toast('No se pudo cargar esa tarjeta'); return; }
     loadState(d,c.id); toast('Tarjeta cargada');
   };
 
-  $('#delc').onclick = async () => {
-    const id=$('#mine').value||cardId, a=getCards(), c=a.find(x=>x.id===id);
+  $('#delc').onclick = async function(){
+    const id=($('#mine')?$('#mine').value:null)||cardId;
+    const a=getCards(), c=a.find(function(x){ return x.id===id; });
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
-    if(!confirm(`¿Borrar la tarjeta "${c.n}"?\nSe eliminará de tu lista.`)) return;
+    if(!confirm('¿Borrar la tarjeta "' + c.n + '"?\nSe eliminará de tu lista.')) return;
     
-    if(WORKER_URL && !WORKER_URL.includes('tunombre.workers.dev')){
-      $('#delc').disabled = true;
-      $('#delc').textContent = 'Borrando…';
+    if(WORKER_URL && WORKER_URL.indexOf('tunombre.workers.dev') === -1){
+      const delBtn=$('#delc');
+      if(delBtn){ delBtn.disabled = true; delBtn.textContent = 'Borrando…'; }
       try {
-        await fetch(`${WORKER_URL}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+        await fetch(WORKER_URL + '?id=' + encodeURIComponent(id), { method: 'DELETE' });
       } catch(e){}
-      $('#delc').disabled = false;
-      $('#delc').textContent = 'Borrar';
+      if(delBtn){ delBtn.disabled = false; delBtn.textContent = 'Borrar'; }
     }
 
-    putCards(a.filter(x=>x.id!==id));
+    putCards(a.filter(function(x){ return x.id!==id; }));
     if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null);
     else refreshMine();
     toast('Tarjeta borrada');
   };
 
-  $('#newc').onclick = () => {
-    const e=enc(S), saved=getCards().some(c=>c.e===e);
+  $('#newc').onclick = function(){
+    const e=enc(S), saved=getCards().some(function(c){ return c.e===e; });
     if(e!==enc(DEFAULT)&&!saved&&!confirm('¿Empezar una tarjeta nueva?')) return;
     loadState(JSON.parse(JSON.stringify(DEFAULT)),null); toast('Tarjeta nueva');
   };
@@ -494,44 +528,71 @@ function startEditor(S){
 
 let tt;
 function toast(m){
-  const t=$('#toast'); if(!t) return;
+  let t=$('#toast'); 
+  if(!t) {
+     t = document.createElement('div');
+     t.id = 'toast';
+     t.className = 'toast';
+     document.body.appendChild(t);
+  }
   t.textContent=m; t.classList.add('show');
-  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3800);
+  clearTimeout(tt); tt=setTimeout(function(){ t.classList.remove('show'); }, 3800);
 }
 
 /* ================= ARRANQUE SEGURO ================= */
-async function startApp(){
+function initApp(){
   try {
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
-    const d = params.get('d') || location.hash.slice(1);
+    const d = params.get('d') || window.location.hash.slice(1);
     const editing = params.has('edit');
 
     if(id){
-      try {
-        const res = await fetch(`cards/${encodeURIComponent(id)}.json`);
-        if(res.ok){
-          const cardData = await res.json();
-          if(!editing) return startVisitor(cardData);
-          cardData.__fromLink = 1;
-          return startEditor(cardData);
-        }
-      } catch(e){}
+      fetch('cards/' + encodeURIComponent(id) + '.json')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if(data){
+            if(!editing) return startVisitor(data);
+            data.__fromLink = 1;
+            return startEditor(data);
+          }
+          startEditor(JSON.parse(JSON.stringify(DEFAULT)));
+        })
+        .catch(function() { startEditor(JSON.parse(JSON.stringify(DEFAULT))); });
+      return;
     }
 
     const fromLink = d ? dec(d) : null;
-    if(fromLink && !editing) return startVisitor(fromLink);
-    if(fromLink && editing){ fromLink.__fromLink=1; return startEditor(fromLink); }
+    if(fromLink && !editing) {
+      startVisitor(fromLink);
+      return;
+    }
+    if(fromLink && editing){ 
+      fromLink.__fromLink=1; 
+      startEditor(fromLink);
+      return;
+    }
 
-    startEditor(JSON.parse(JSON.stringify(DEFAULT)));
+    let initial = JSON.parse(JSON.stringify(DEFAULT));
+    try {
+      const raw = localStorage.getItem('globos-draft');
+      if(raw){ 
+        const parsed = dec(raw); 
+        if(parsed) initial = parsed; 
+      }
+    } catch(e){}
+    
+    startEditor(initial);
   } catch(err) {
+    try { localStorage.removeItem('globos-draft'); localStorage.removeItem('globos-cur'); } catch(e){}
     startEditor(JSON.parse(JSON.stringify(DEFAULT)));
   }
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startApp);
+  document.addEventListener('DOMContentLoaded', initApp);
 } else {
-  startApp();
+  initApp();
 }
+
 })();
