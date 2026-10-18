@@ -50,7 +50,6 @@ function sanitize(o){
   if(typeof o.d==='string') r.d=o.d.slice(0,160);
   if(o.a&&typeof o.a.v==='string'){
     if(o.a.m==='ig'||o.a.m==='url') r.a={m:o.a.m,v:o.a.v.slice(0,400)};
-    else if(o.a.m==='file'&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(o.a.v)&&o.a.v.length<=9000) r.a={m:'file',v:o.a.v};
   }
   if(TH[o.t]) r.t=o.t;
   if(Array.isArray(o.g)) r.g=o.g.filter(x=>Array.isArray(x)&&NET[x[0]]).slice(0,12).map(x=>[x[0],String(x[1]||'').slice(0,400)]);
@@ -102,7 +101,6 @@ function applyTheme(el,t){
 
 function avatarURL(a){
   const v=(a.v||'').trim(); if(!v) return '';
-  if(a.m==='file') return /^data:image\//.test(v)?v:'';
   if(a.m==='ig'){
     const m=v.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
     const u=m?m[1]:v.replace(/^@/,'').split(/[\/?#\s]/)[0];
@@ -173,9 +171,9 @@ function startVisitor(S){
 }
 
 function startEditor(S){
-  let photoMode=S.a.m, shortInfo=null, cardId=localStorage.getItem('globos-cur')||null;
+  let photoMode=S.a.m==='url'?'url':'ig', shortInfo=null, cardId=localStorage.getItem('globos-cur')||null;
   try{ const raw=localStorage.getItem('globos-draft'); if(raw&&!S.__fromLink){ const d=dec(raw); if(d) S=d; } }catch{}
-  delete S.__fromLink; photoMode=S.a.m;
+  delete S.__fromLink; photoMode=S.a.m==='url'?'url':'ig';
 
   const catHTML=Object.keys(NET).map(k=>`<button type="button" data-add="${k}" aria-label="Añadir ${esc(NET[k].n)}" title="${esc(NET[k].n)}" style="background:${NET[k].c}">${iconHTML(k)}</button>`).join('');
 
@@ -184,35 +182,50 @@ function startEditor(S){
     <div class="logo"><div class="dots"><i style="left:0;top:4px;width:20px;height:20px;background:#D4FF4F"></i><i style="left:12px;top:0;width:24px;height:24px;background:#7C5CFF"></i><i style="left:28px;top:8px;width:16px;height:16px;background:#FF7A59"></i></div>globos</div>
     <div class="linkbox"><div><span id="lk"></span><small id="sz"></small></div></div>
     <select class="tb sel" id="mine" aria-label="Mis tarjetas"></select>
-    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5">Guardar</button>
+    <button class="tb" id="savecard" type="button" style="background:#5B3DF5;border-color:#5B3DF5;color:#fff;font-weight:700">💾 Guardar y generar link</button>
+    <button class="copy" id="copy" type="button">Copiar enlace</button>
+    <button class="tb" id="ghcfg" type="button" title="Configurar GitHub">⚙ Configurar Git</button>
     <button class="tb" id="newc" type="button">Nueva</button>
     <button class="tb" id="delc" type="button">Borrar</button>
     <button class="tb" id="vis" type="button">Vista previa</button>
-    <button class="copy" id="copy" type="button">Copiar enlace</button>
   </div>
   <div class="split">
    <div class="panel">
     <div class="sec"><div class="sh"><b>1</b>Perfil</div>
       <div><label for="n">Nombre o título</label><input class="in" id="n" maxlength="60"></div>
       <div><label for="d">Descripción corta <span class="cnt" id="cnt"></span></label><textarea class="in" id="d" maxlength="160"></textarea></div>
-      <div><label>Foto de perfil</label><div class="row" style="flex-wrap:wrap"><div class="seg" id="seg"><button type="button" data-m="ig">Instagram</button><button type="button" data-m="file">Subir foto</button><button type="button" data-m="url">URL</button></div><input class="in" id="av-in" aria-label="Usuario o URL" style="flex:1;min-width:140px;width:auto"><button class="tb" id="av-go" type="button" style="color:var(--ink);border-color:var(--ink)">Buscar</button><button class="tb" id="av-fb" type="button" style="color:var(--ink);border-color:var(--ink)">Elegir foto…</button><input type="file" id="av-file" accept="image/*" hidden></div><div class="status" id="avs"></div></div>
+      <div><label>Foto de perfil</label>
+        <div class="row" style="flex-wrap:wrap">
+          <div class="seg" id="seg"><button type="button" data-m="ig">Instagram</button><button type="button" data-m="url">URL</button></div>
+          <input class="in" id="av-in" aria-label="Usuario o URL" style="flex:1;min-width:140px;width:auto">
+          <button class="tb" id="av-go" type="button" style="color:var(--ink);border-color:var(--ink)">Buscar</button>
+        </div>
+        <div class="status" id="avs"></div>
+      </div>
     </div>
     <div class="sec"><div class="sh"><b>2</b>Tema</div><div class="themes" id="themes"></div></div>
     <div class="sec"><div class="sh"><b>3</b>Globos de redes<em>Toca un logo para añadirlo</em></div><div class="cat" id="cat">${catHTML}</div><div style="display:flex;flex-direction:column;gap:8px" id="gl"></div></div>
     <div class="sec"><div class="sh"><b>4</b>Botones de acción</div><div style="display:flex;flex-direction:column;gap:8px" id="bl"></div><button class="add" id="addb" type="button">+ Añadir botón</button></div>
-    <div class="note"><span>Al tocar "Guardar", se guarda tu tarjeta y se genera automáticamente tu enlace corto listo para copiar.</span></div>
+    <div class="note"><span>Toca "Guardar y generar link" para almacenar tu tarjeta. Una vez generado, puedes usar "Copiar enlace" cuando lo necesites.</span></div>
    </div>
-   <div class="stage"><div class="bar"><span class="live"><i></i>Vista previa en vivo</span><button class="play" id="play" type="button">▶ Probar efecto de globos</button><label class="chk"><input type="checkbox" id="shortOn" checked> Acortar enlace al guardar</label></div>
+   <div class="stage">
+     <div class="bar">
+       <span class="live"><i></i>Vista previa en vivo</span>
+       <button class="play" id="play" type="button">▶ Probar efecto de globos</button>
+       <label class="chk"><input type="checkbox" id="shortOn" checked> Acortar enlace al guardar</label>
+     </div>
      <div class="warn" id="warn" hidden></div>
      <div class="phone" id="phone">${cardHTML()}</div>
-     <div style="font-size:13px;color:#4A465C;text-align:center">Cada letra, color o logo se refleja aquí al instante.</div>
+     <div style="font-size:13px;color:#4A465C;text-align:center">Cada cambio se refleja aquí en tiempo real.</div>
    </div>
   </div>`;
 
-  const phone=$('#phone'), W=276, CK='globos-cards';
+  const phone=$('#phone'), W=276, CK='globos-cards', GHK='globos-gh-config';
   const getCards = () => { try{ return JSON.parse(localStorage.getItem(CK))||[]; }catch{ return []; } };
   const putCards = a => localStorage.setItem(CK,JSON.stringify(a.slice(0,50)));
   const setCur = () => cardId?localStorage.setItem('globos-cur',cardId):localStorage.removeItem('globos-cur');
+
+  function getGH(){ try{ return JSON.parse(localStorage.getItem(GHK))||null; }catch{ return null; } }
 
   function longLink(){
     const base = (location.protocol==='file:'||location.origin==='null') 
@@ -244,7 +257,35 @@ function startEditor(S){
     putCards(a); setCur(); refreshMine();
   }
 
-  function jsonp(url,ms=9000){
+  // Guardado permanente en el repositorio de GitHub
+  async function saveToGitHub(){
+    const gh = getGH();
+    if(!gh || !gh.token || !gh.user || !gh.repo) return false;
+    try {
+      const fileName = `cards/${cardId || 'card'}.json`;
+      const url = `https://api.github.com/repos/${gh.user}/${gh.repo}/contents/${fileName}`;
+      let sha = null;
+      try {
+        const check = await fetch(url, { headers: { Authorization: `token ${gh.token}`, Accept: 'application/vnd.github.v3+json' } });
+        if(check.ok){ const dat = await check.json(); sha = dat.sha; }
+      } catch(e){}
+
+      const content = btoa(unescape(encodeURIComponent(JSON.stringify(S, null, 2))));
+      const body = { message: `Guardar tarjeta: ${S.n || 'card'}`, content };
+      if(sha) body.sha = sha;
+
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { Authorization: `token ${gh.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res.ok;
+    } catch(err){
+      return false;
+    }
+  }
+
+  function jsonp(url,ms=7000){
     return new Promise(res=>{
       const cb='gcb'+Math.random().toString(36).slice(2), s=document.createElement('script'); let done=false;
       const end=v=>{ if(done)return; done=true; clearTimeout(t); delete window[cb]; s.remove(); res(v); };
@@ -259,30 +300,23 @@ function startEditor(S){
       return {err:'Publica tu proyecto en GitHub Pages para acortar enlaces.'};
     }
     try{
-      const res = await fetch('https://tinyurl.com/api-create.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: new URLSearchParams({url: l})
-      });
-      const txt = (await res.text()).trim();
-      if(/^https?:\/\/\S+$/.test(txt)) return {u:txt};
+      const d = await jsonp(`https://is.gd/create.php?format=json&url=${encodeURIComponent(l)}`, 6000);
+      if(d?.shorturl) return {u:d.shorturl};
     }catch{}
 
     try{
-      const res = await fetch('https://tinyurl.com/api-create.php?url='+encodeURIComponent(l));
+      const d = await jsonp(`https://v.gd/create.php?format=json&url=${encodeURIComponent(l)}`, 6000);
+      if(d?.shorturl) return {u:d.shorturl};
+    }catch{}
+
+    try{
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(l))}`;
+      const res = await fetch(proxyUrl);
       const txt = (await res.text()).trim();
       if(/^https?:\/\/\S+$/.test(txt)) return {u:txt};
     }catch{}
 
-    for(const host of ['is.gd','v.gd']){
-      const d=await jsonp(`https://${host}/create.php?format=json&url=${encodeURIComponent(l)}`);
-      if(d?.shorturl) return {u:d.shorturl};
-    }
-
-    if(S.a.m==='file' && l.length>2500){
-      return {err:'La foto subida es muy pesada para acortar. Usa URL o Instagram.'};
-    }
-    return {err:'No se pudo acortar'};
+    return {err:'Servidores de acortado temporalmente ocupados'};
   }
 
   const missingCount = () => ({ g:S.g.filter(x=>!norm(x[0],x[1])).length, b:S.b.filter(x=>x[0].trim()&&!norm('',x[1])).length });
@@ -298,7 +332,7 @@ function startEditor(S){
   const copyText = (t,msg) => navigator.clipboard?.writeText(t).then(()=>toast(msg),()=>prompt('Copia tu enlace:',t)) || prompt('Copia tu enlace:',t);
 
   function loadState(d,id,sh){
-    S=d; cardId=id||null; shortInfo=sh||null; photoMode=S.a.m; setCur();
+    S=d; cardId=id||null; shortInfo=sh||null; photoMode=S.a.m==='url'?'url':'ig'; setCur();
     $('#n').value=S.n; $('#d').value=S.d; $('#av-in').value=S.a.v;
     renderSeg(); renderThemes(); renderGlobos(); renderBtnsList(); $('#av').dataset.src=''; refreshMine(); save();
     if(S.a.v) updateAvatar(S,setStatus,true);
@@ -307,12 +341,12 @@ function startEditor(S){
   function setStatus(s){
     const el=$('#avs'); el.className='status';
     const msgs={
-      none:photoMode==='ig'?'Escribe tu usuario de Instagram y pulsa Buscar.':photoMode==='file'?'Elige una foto de tu equipo.':'Pega la URL directa de una imagen.',
+      none:photoMode==='ig'?'Escribe tu usuario de Instagram y pulsa Buscar.':'Pega la URL directa de una imagen.',
       pending:'Pulsa Buscar (o Enter) para cargar la foto.',
       load:'Buscando foto…',
-      ok:photoMode==='file'?'Foto lista. Va guardada dentro del enlace.':'Foto encontrada.'
+      ok:'Foto encontrada.'
     };
-    el.textContent=msgs[s]||(photoMode==='ig'?'No se pudo cargar la foto de Instagram. Prueba con "Subir foto".':'No se pudo cargar esa imagen.');
+    el.textContent=msgs[s]||(photoMode==='ig'?'No se pudo cargar la foto de Instagram.':'No se pudo cargar esa imagen.');
     if(s==='ok') el.classList.add('ok');
   }
 
@@ -328,9 +362,7 @@ function startEditor(S){
   function renderSeg(){
     document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===photoMode));
     $('#av-in').placeholder=photoMode==='ig'?'tu.usuario':'https://…/foto.jpg';
-    $('#av-in').style.display=photoMode==='file'?'none':'';
     $('#av-go').style.display=photoMode==='ig'?'':'none';
-    $('#av-fb').style.display=photoMode==='file'?'':'none';
   }
 
   function renderThemes(){
@@ -365,27 +397,10 @@ function startEditor(S){
   $('#av-in').onkeydown = e => { if(e.key==='Enter'){ clearTimeout(avT); lookup(); } };
   $('#av-in').onblur = () => { clearTimeout(avT); if(photoMode==='ig') lookup(); };
   $('#av-go').onclick = () => { clearTimeout(avT); lookup(); };
-  $('#av-fb').onclick = () => $('#av-file').click();
-
-  $('#av-file').onchange = e => {
-    const f=e.target.files?.[0]; if(!f) return;
-    const u=URL.createObjectURL(f), im=new Image();
-    im.onload=()=>{
-      const n=96, c=document.createElement('canvas'); c.width=c.height=n;
-      const s=Math.min(im.width,im.height);
-      c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,n,n);
-      let q=.6, d=c.toDataURL('image/jpeg',q);
-      while(d.length>4500&&q>.25){ q-=.08; d=c.toDataURL('image/jpeg',q); }
-      URL.revokeObjectURL(u);
-      S.a={m:'file',v:d}; $('#av').dataset.src=''; save(); lookup();
-    };
-    im.onerror=()=>{ URL.revokeObjectURL(u); toast('No se pudo leer esa imagen'); };
-    im.src=u; e.target.value='';
-  };
 
   $('#seg').onclick = e => {
     const b=e.target.closest('button'); if(!b) return;
-    photoMode=b.dataset.m; S.a={m:photoMode,v:photoMode==='file'?'':$('#av-in').value};
+    photoMode=b.dataset.m; S.a={m:photoMode,v:$('#av-in').value};
     renderSeg(); $('#av').dataset.src=''; save(); if(photoMode!=='ig') lookup();
   };
 
@@ -422,53 +437,59 @@ function startEditor(S){
 
   $('#play').onclick = () => save({fresh:true});
   $('#vis').onclick = () => {
-    const m=missingCount(); if(m.g||m.b) toast('Ojo: los globos y botones sin enlace no se mostrarán a tus visitantes');
+    const m=missingCount(); if(m.g||m.b) toast('Ojo: los elementos sin enlace no se mostrarán a los visitantes');
     window.open(longLink(),'_blank');
   };
 
-  // Guardar y acortar de inmediato
-  async function saveAndShortenAction(){
+  // Botón GUARDAR: Guarda localmente, en Git (si está configurado) y genera el link
+  $('#savecard').onclick = async () => {
     const btn=$('#savecard'), long=longLink();
     upsertCard();
 
-    if(!$('#shortOn').checked){
-      refreshLink();
-      toast('¡Tarjeta guardada!');
-      return long;
-    }
-
-    const known=shortFor();
-    if(known){
-      refreshLink();
-      toast('¡Tarjeta guardada!');
-      return known;
-    }
-
     btn.disabled=true; btn.textContent='Guardando…';
-    const s=await getShort(long);
-    btn.disabled=false; btn.textContent='Guardar';
+    const savedInGit = await saveToGitHub();
 
-    if(s.u){
-      shortInfo={e:enc(S),u:s.u};
-      upsertCard();
-      refreshLink();
-      toast('¡Tarjeta guardada y enlace corto listo!');
-      return s.u;
-    } else {
-      refreshLink();
-      toast('Guardada. ' + (s.err || 'Usa el enlace completo.'));
-      return long;
+    if($('#shortOn').checked){
+      btn.textContent='Acortando…';
+      const s = await getShort(long);
+      btn.disabled=false; btn.textContent='💾 Guardar y generar link';
+      if(s.u){
+        shortInfo={e:enc(S),u:s.u};
+        upsertCard();
+        refreshLink();
+        toast('¡Tarjeta guardada' + (savedInGit ? ' en Git' : '') + ' y enlace generado!');
+        return;
+      }
     }
-  }
 
-  $('#savecard').onclick = saveAndShortenAction;
+    btn.disabled=false; btn.textContent='💾 Guardar y generar link';
+    refreshLink();
+    toast('¡Tarjeta guardada' + (savedInGit ? ' en Git de por vida!' : '!'));
+  };
 
-  $('#copy').onclick = async () => {
-    const link = await saveAndShortenAction();
-    const mc=missingCount();
-    let msg='¡Enlace copiado!';
-    if(mc.g||mc.b) msg+=' (Hay elementos sin enlace que no se mostrarán)';
-    copyText(link, msg);
+  // Botón COPIAR: Exclusivamente copia el enlace activo sin re-guardar
+  $('#copy').onclick = () => {
+    const activeLink = shortFor() || longLink();
+    copyText(activeLink, '¡Enlace copiado al portapapeles!');
+  };
+
+  // Configuración de GitHub para almacenamiento persistente
+  $('#ghcfg').onclick = () => {
+    const cur = getGH() || { user:'', repo:'', token:'' };
+    const user = prompt('Tu usuario de GitHub:', cur.user);
+    if(user === null) return;
+    const repo = prompt('Nombre del repositorio (ej: BubbleTree):', cur.repo || 'BubbleTree');
+    if(repo === null) return;
+    const token = prompt('Token Personal de GitHub (con permiso "repo"):', cur.token);
+    if(token === null) return;
+
+    if(user.trim() && repo.trim() && token.trim()){
+      localStorage.setItem(GHK, JSON.stringify({ user: user.trim(), repo: repo.trim(), token: token.trim() }));
+      toast('GitHub vinculado. Se guardará de por vida en tu repo.');
+    } else {
+      localStorage.removeItem(GHK);
+      toast('Configuración de Git eliminada.');
+    }
   };
 
   $('#mine').onchange = e => {
@@ -481,7 +502,7 @@ function startEditor(S){
   $('#delc').onclick = () => {
     const id=$('#mine').value||cardId, a=getCards(), c=a.find(x=>x.id===id);
     if(!c){ toast('Elige primero una tarjeta en "Mis tarjetas"'); return; }
-    if(!confirm(`¿Borrar la tarjeta "${c.n}" de tu lista?\nLos enlaces que ya publicaste seguirán funcionando.`)) return;
+    if(!confirm(`¿Borrar la tarjeta "${c.n}" de tu lista?`)) return;
     putCards(a.filter(x=>x.id!==id));
     if(id===cardId) loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null);
     else refreshMine();
@@ -490,8 +511,8 @@ function startEditor(S){
 
   $('#newc').onclick = () => {
     const e=enc(S), saved=getCards().some(c=>c.e===e);
-    if(e!==enc(DEFAULT)&&!saved&&!confirm('Esta tarjeta aún no está guardada. ¿Empezar una nueva de todas formas?')) return;
-    loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null); toast('Tarjeta nueva iniciada');
+    if(e!==enc(DEFAULT)&&!saved&&!confirm('¿Empezar una tarjeta nueva?')) return;
+    loadState(JSON.parse(JSON.stringify(DEFAULT)),null,null); toast('Tarjeta nueva');
   };
 }
 
