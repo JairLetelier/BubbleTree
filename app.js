@@ -228,7 +228,7 @@ function startVisitor(S){
   const c = $('#card');
   if(c){
     c.classList.remove('noanim');
-    c.insertAdjacentHTML('beforeend','<div class="credit" style="text-align:center;padding:30px 0 20px;line-height:1.6"><div style="font-size:13px;opacity:.85;color:var(--fg)">¿Te gustaría tener tu propia página de enlaces?</div><a href="'+esc(location.pathname)+'" style="font-weight:bold;font-size:14px;text-decoration:none;color:var(--fg)">✨ Crea la tuya gratis con BubbleTree</a></div>');
+    c.insertAdjacentHTML('beforeend','<div class="credit" style="text-align:center;padding:30px 0 20px;line-height:1.6"><div style="font-size:13px;opacity:.85;color:var(--fg)">¿Te gustaría tener tu propia página de enlaces?</div><a href="'+esc(location.pathname)+'" style="font-weight:bold;font-size:14px;text-decoration:none;color:var(--fg)">✨ Crea la tuya con BubbleTree</a></div>');
   }
   const root = document.documentElement;
   applyTheme(root, S.t);
