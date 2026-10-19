@@ -403,6 +403,31 @@ function startEditor(S){
   loadState(S, cardId);
   if(fromLinkFlag) upsertCard();
 
+  function cardFileURL(id){ return 'cards/' + encodeURIComponent(id) + '.json?t=' + Date.now(); }
+
+  async function syncRemote(){
+    try{
+      const r = await fetch(WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      const j = await r.json();
+      if(!j || !j.ok || !Array.isArray(j.ids)) return;
+      const have = getCards();
+      const missing = j.ids.filter(function(id){ return !have.some(function(c){ return c.id === id; }); }).slice(0, 50);
+      if(!missing.length) return;
+      const got = await Promise.all(missing.map(function(id){
+        return fetch(cardFileURL(id)).then(function(x){ return x.ok ? x.json() : null; }).catch(function(){ return null; }).then(function(raw){
+          if(!raw) return null;
+          const d = sanitize(raw); d.id = id;
+          return { id: id, n: d.n || id, e: enc(d) };
+        });
+      }));
+      const add = got.filter(Boolean);
+      if(!add.length) return;
+      putCards(add.concat(getCards()).slice(0, 50));
+      refreshMine();
+    }catch(e){}
+  }
+  syncRemote();
+
   $('#n').oninput = function(e){ S.n = e.target.value; S.id = slugify(S.n); cardId = S.id || null; save(); };
   $('#d').oninput = function(e){ S.d = e.target.value; save(); };
   $('#lo').onchange = function(e){ S.lo = e.target.checked ? 1 : 0; save({fresh: true}); };
@@ -498,10 +523,17 @@ function startEditor(S){
     } else prompt('Copia tu enlace:', t);
   };
 
-  $('#mine').onchange = function(e){
-    const c = getCards().find(function(x){ return x.id === e.target.value; });
+  $('#mine').onchange = async function(e){
+    const id = e.target.value;
+    const c = getCards().find(function(x){ return x.id === id; });
     if(!c){ refreshMine(); return; }
-    const d = dec(c.e); if(!d) return toast('No se pudo cargar esa tarjeta');
+    let d = null;
+    try{
+      const r = await fetch(cardFileURL(id));
+      if(r.ok){ d = sanitize(await r.json()); d.id = id; }
+    }catch(err){}
+    if(!d) d = dec(c.e);
+    if(!d) return toast('No se pudo cargar esa tarjeta');
     loadState(d, c.id); toast('Tarjeta cargada');
   };
 
