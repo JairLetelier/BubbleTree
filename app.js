@@ -42,6 +42,7 @@ const DEFAULT = {
   b:[['Catálogo PDF',''],['Tienda online','']]
 };
 
+const AVMAX = 4000;
 const clone = function(o){ return JSON.parse(JSON.stringify(o)); };
 const esc = function(s){ return String(s !== null && s !== undefined ? s : '').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
 const $ = function(s, r){ return (r || document).querySelector(s); };
@@ -66,9 +67,9 @@ function sanitize(o){
   if(typeof o.d === 'string') r.d = o.d.slice(0,160);
   
   if(typeof o.a === 'string' && o.a.trim()){
-    r.a = { m: /^https?:\/\//i.test(o.a) ? 'url' : 'ig', v: o.a.trim().slice(0,400) };
+    r.a = { m: /^https?:\/\//i.test(o.a) ? 'url' : 'ig', v: o.a.trim().slice(0,AVMAX) };
   } else if(o.a && typeof o.a === 'object'){
-    const val = typeof o.a.v === 'string' ? o.a.v.trim().slice(0,400) : '';
+    const val = typeof o.a.v === 'string' ? o.a.v.trim().slice(0,AVMAX) : '';
     const mode = (o.a.m === 'url' || o.a.m === 'ig') ? o.a.m : (/^https?:\/\//i.test(val) ? 'url' : 'ig');
     r.a = { m: mode, v: val };
   }
@@ -111,7 +112,7 @@ function layout(n, W){
   return {H: Math.max(H, Math.ceil(n / cols) * cell), items: Array.from({length:n}, function(_,i){ return {x: (i % cols) * cell + (cell - s)/2, y: Math.floor(i / cols) * cell + (cell - s)/2, s:s}; })};
 }
 
-const cardHTML = function(){ return '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt=""><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>'; };
+const cardHTML = function(){ return '<div class="card noanim" id="card"><div class="avatar"><img id="av" alt="" referrerpolicy="no-referrer"><span id="avl"></span></div><div class="cloud" id="cloud"></div><h1 id="cn"></h1><p id="cd"></p><div class="btns" id="cb"></div></div>'; };
 
 let LAY = null, LAYSIG = '';
 function applyTheme(el, t){
@@ -143,28 +144,31 @@ function updateAvatar(S, cb){
   const avl = $('#avl');
   if (avl) avl.textContent = (S.n || '?').trim().charAt(0).toUpperCase() || '?';
 
+  img._cb = cb;
+  const report = function(st){
+    img.dataset.state = st;
+    img.style.display = st === 'ok' ? 'block' : 'none';
+    if (img._cb) img._cb(st);
+  };
+
   const url = avatarURL(S.a);
   if (!url) {
-    img.style.display = 'none';
+    img.dataset.cur = '';
     img.removeAttribute('src');
-    if (cb) cb('none');
+    report('none');
     return;
   }
 
-  if (cb) cb('load');
-  img.onload = function() {
-    img.style.display = 'block';
-    if (cb) cb('ok');
-  };
-  img.onerror = function() {
-    img.style.display = 'none';
-    if (cb) cb('err');
-  };
+  // misma foto que ya se cargó/está cargando: no volver a pedirla
+  if (img.dataset.cur === url && img.dataset.state) { report(img.dataset.state); return; }
+
+  img.dataset.cur = url;
+  report('load');
+  img.referrerPolicy = 'no-referrer';
+  img.onload = function(){ if (img.dataset.cur === url) report('ok'); };
+  img.onerror = function(){ if (img.dataset.cur === url) report('err'); };
   img.src = url;
-  if (img.complete && img.naturalWidth > 0) {
-    img.style.display = 'block';
-    if (cb) cb('ok');
-  }
+  if (img.complete && img.naturalWidth > 0) report('ok');
 }
 
 function renderCloud(S, visitor, W, fresh){
@@ -209,7 +213,7 @@ function updateCard(S, o){
     }
   }
   applyTheme(o.themeEl, S.t);
-  updateAvatar(S, o.onAvatar);
+  if(!o.skipAvatar) updateAvatar(S, o.onAvatar);
   renderCloud(S, o.visitor, o.W, o.fresh);
   renderBtns(S, o.visitor);
 }
@@ -232,6 +236,7 @@ function startVisitor(S){
 }
 
 function startEditor(S){
+  const fromLinkFlag = !!(S && S.__fromLink);
   S = sanitize(S);
   let photoMode = (S.a && S.a.m === 'url') ? 'url' : 'ig';
   let cardId = S.id || null;
@@ -342,7 +347,7 @@ function startEditor(S){
     S.a = { m: photoMode, v: avVal };
 
     if(phone && phone.firstElementChild) phone.firstElementChild.classList.add('noanim');
-    updateCard(S, {W:W, themeEl: phone, fresh: o.fresh, onAvatar: setStatus});
+    updateCard(S, {W:W, themeEl: phone, fresh: o.fresh, onAvatar: setStatus, skipAvatar: o.skipAvatar});
     if(o.fresh && phone && phone.firstElementChild) phone.firstElementChild.classList.remove('noanim');
     refreshLink(); refreshWarn();
     const cnt = $('#cnt'); if(cnt) cnt.textContent = S.d.length + ' / 160';
@@ -396,7 +401,7 @@ function startEditor(S){
   }
 
   loadState(S, cardId);
-  if(S.__fromLink) upsertCard();
+  if(fromLinkFlag) upsertCard();
 
   $('#n').oninput = function(e){ S.n = e.target.value; S.id = slugify(S.n); cardId = S.id || null; save(); };
   $('#d').oninput = function(e){ S.d = e.target.value; save(); };
@@ -409,7 +414,7 @@ function startEditor(S){
       photoMode = 'url';
       renderSeg();
     }
-    save();
+    save({skipAvatar: true});
     clearTimeout(avT);
     avT = setTimeout(function(){ updateAvatar(S, setStatus); }, 500);
   };
